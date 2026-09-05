@@ -12,7 +12,9 @@
     "build": "npm run build --workspace @boom/client",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "npm run typecheck --workspaces --if-present"
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "spawns": "node packages/assets/spawns.mjs",
+    "server": "npm run start --workspace @boom/server"
   },
   "devDependencies": {
     "typescript": "^5.7.2",

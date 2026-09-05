@@ -8,11 +8,103 @@
 	</head>
 	<body>
 		<main id="stage"></main>
+
+		<div id="overlay" hidden>
+			<!-- Titelscherm -->
+			<section class="panel" id="screen-title">
+				<h1>BOOM<span>online</span></h1>
+				<div class="menu">
+					<button data-action="solo">Eén speler</button>
+					<button data-action="coop-local">Co-op op één toetsenbord</button>
+					<button data-action="host">Online kamer openen</button>
+					<button data-action="join">Kamer binnenlopen</button>
+					<button data-action="options">Instellingen</button>
+				</div>
+				<p class="hint">
+					Speler 1: pijltjes + spatie &nbsp;·&nbsp; Speler 2: WASD + linker shift &nbsp;·&nbsp;
+					Esc pauzeert.<br />
+					Online spelen er tot vier mee; iedereen speelt dan met de pijltjes.
+				</p>
+			</section>
+
+			<!-- Kamercode invoeren -->
+			<section class="panel" id="screen-join" hidden>
+				<h2>Kamer binnenlopen</h2>
+				<label>
+					Kamercode
+					<input id="room-code" maxlength="4" autocomplete="off" spellcheck="false" placeholder="ABCD" />
+				</label>
+				<div class="menu row">
+					<button data-action="join-go">Meedoen</button>
+					<button data-action="back">Terug</button>
+				</div>
+				<p class="error" id="join-error"></p>
+			</section>
+
+			<!-- Wachtkamer -->
+			<section class="panel" id="screen-lobby" hidden>
+				<h2>Kamer <span id="lobby-code">····</span></h2>
+				<p class="hint">Deel deze code of de link. Er kunnen tot vier spelers mee.</p>
+				<div class="link-row">
+					<input id="lobby-link" readonly />
+					<button data-action="copy-link">Kopieer</button>
+				</div>
+				<ul id="lobby-members"></ul>
+				<div class="menu row">
+					<button data-action="start-game" id="start-game">Starten</button>
+					<button data-action="leave">Verlaten</button>
+				</div>
+			</section>
+
+			<!-- Pauze -->
+			<section class="panel" id="screen-pause" hidden>
+				<h2>Pauze</h2>
+				<div class="menu">
+					<button data-action="resume">Verder spelen</button>
+					<button data-action="options">Instellingen</button>
+					<button data-action="quit">Terug naar het menu</button>
+				</div>
+			</section>
+
+			<!-- Instellingen -->
+			<section class="panel" id="screen-options" hidden>
+				<h2>Instellingen</h2>
+				<fieldset>
+					<legend>Beeld</legend>
+					<label class="radio">
+						<input type="radio" name="mode" value="crisp" />
+						<span><b>Scherp</b> — de originele pixels, hele schaalfactor</span>
+					</label>
+					<label class="radio">
+						<input type="radio" name="mode" value="smooth" />
+						<span><b>Glad</b> — 4x opgeschaald met Scale2x, zachtere randen</span>
+					</label>
+				</fieldset>
+				<fieldset>
+					<legend>Geluid</legend>
+					<label class="slider">Effecten <input type="range" id="vol-sfx" min="0" max="100" /></label>
+					<label class="slider">Muziek <input type="range" id="vol-music" min="0" max="100" /></label>
+				</fieldset>
+				<div class="menu row">
+					<button data-action="back">Terug</button>
+				</div>
+			</section>
+
+			<!-- Einde -->
+			<section class="panel" id="screen-gameover" hidden>
+				<h2 id="gameover-title">Game over</h2>
+				<p id="gameover-score"></p>
+				<div class="menu row">
+					<button data-action="quit">Terug naar het menu</button>
+				</div>
+			</section>
+		</div>
+
 		<footer id="hud">
-			<span id="hud-level">—</span>
-			<span id="hud-scale">—</span>
-			<span class="hint">← → van level wisselen · H voor hulplijnen</span>
+			<span id="hud-status">Laden…</span>
+			<span class="hint" id="hud-scale"></span>
 		</footer>
+
 		<script type="module" src="/src/main.ts"></script>
 	</body>
 </html>

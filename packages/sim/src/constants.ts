@@ -26,7 +26,13 @@ export const GAME_ORIGIN_X = SIDE_PANEL_WIDTH; // 96
  */
 export const MAIN_WINDOW_SHIFT = 1 + SIDE_PANEL_WIDTH; // 97
 
-export const MAX_PLAYERS = 2;
+/**
+ * Vier spelers. Het origineel kent er twee (src/lifish/game.hpp:29) omdat elke tilemap maar
+ * één X en één Y heeft; de extra spawnpunten worden gegenereerd door packages/assets/spawns.mjs.
+ */
+export const MAX_PLAYERS = 4;
+/** Zoveel spelers heeft het origineel; daarboven wordt het onze eigen uitbreiding. */
+export const ORIGINAL_MAX_PLAYERS = 2;
 export const N_ENEMIES = 10;
 
 // ── Simulatie ──

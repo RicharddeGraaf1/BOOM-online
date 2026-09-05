@@ -9,6 +9,8 @@ export const Tile = {
 	COIN: 'coin',
 	PLAYER1: 'player1',
 	PLAYER2: 'player2',
+	PLAYER3: 'player3',
+	PLAYER4: 'player4',
 	TELEPORT: 'teleport',
 	ENEMY: 'enemy',
 	ALIEN_BOSS: 'alienBoss',
@@ -29,6 +31,9 @@ const CHAR_TO_CELL: Readonly<Record<string, TileCell>> = {
 	'3': { kind: Tile.COIN },
 	X: { kind: Tile.PLAYER1 },
 	Y: { kind: Tile.PLAYER2 },
+	// Eigen uitbreiding: gegenereerd door packages/assets/spawns.mjs, niet uit het origineel.
+	Z: { kind: Tile.PLAYER3 },
+	W: { kind: Tile.PLAYER4 },
 	'+': { kind: Tile.TELEPORT },
 	A: { kind: Tile.ENEMY, enemyId: 1 },
 	B: { kind: Tile.ENEMY, enemyId: 2 },

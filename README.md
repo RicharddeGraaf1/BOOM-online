@@ -1,10 +1,10 @@
 # BOOM Online
 
-BOOM in de browser, kraakhelder, en met z'n tweeën over internet speelbaar via een gedeelde link.
+BOOM in de browser, kraakhelder, en met z'n vieren over internet speelbaar via een gedeelde link.
 
 Herbouw in TypeScript van [BOOM Remake / lifish](https://github.com/silverweed/lifish) van
-silverweed, zelf een remake van BOOM (Factor Software, Mac). De C++-bron is onze specificatie:
-tuning-constanten en AI worden overgeschreven, niet opnieuw bedacht.
+silverweed, zelf een remake van BOOM (Factor Software, Mac). De C++-bron is de specificatie:
+tuning-constanten en vijand-AI zijn overgeschreven, niet opnieuw bedacht.
 
 Het plan staat in [docs/PLAN.md](docs/PLAN.md).
 
@@ -16,42 +16,79 @@ BOOM-installatie nodig.
 ```sh
 npm install
 npm run assets:import      # zoekt o.a. D:/BOOM/windowsx64/assets
-npm run dev
+npm run spawns             # spawnpunten voor speler 3 en 4 (optioneel)
+npm run dev                # solo en lokale co-op
 ```
 
-Vindt het script je installatie niet, wijs hem dan aan:
+Online spelen vraagt de server, die ook de gebouwde client serveert:
 
 ```sh
-BOOM_ASSETS=/pad/naar/BOOM/assets npm run assets:import
+npm run build
+npm run server             # http://localhost:8080
 ```
 
-Andere scripts: `npm test`, `npm run typecheck`, `npm run build`.
+Vindt het importscript je installatie niet, wijs hem dan aan met
+`BOOM_ASSETS=/pad/naar/BOOM/assets npm run assets:import`.
 
-## Waar het nu staat
+## Spelen
 
-**Fase 0 — fundament.** Een level-viewer: alle 80 levels doorbladeren met ← →, hulplijnen op
-het 32px-raster met H. Nog geen simulatie; dit bestaat om te controleren dat de geometrie klopt
-en dat het beeld op elk scherm scherp is.
+| | |
+|---|---|
+| Speler 1 | pijltjes + spatie |
+| Speler 2 (lokaal) | WASD + linker shift |
+| Pauze | Esc |
+
+Online opent de gastheer een kamer en deelt de code van vier tekens of de link. Er kunnen tot
+vier spelers mee; iedereen speelt dan met de pijltjes.
+
+In **Instellingen** staat de beeldmodus:
+
+- **Scherp** — de originele pixels, nearest-neighbour, hele schaalfactor. Pixel-perfect.
+- **Glad** — dezelfde art 4× opgeschaald met Scale2x en lineair gefilterd. Zachtere randen,
+  en omdat de textuur vier keer zoveel pixels heeft ook op een 4K-scherm nog scherp. Er wordt
+  geen kleur verzonnen die niet in het origineel zat.
+
+## Wat er werkt
+
+Alle zes fasen uit het plan zijn af.
+
+- 80 levels, 10 vijandtypes met hun eigen AI, de alien boss en de big alien boss.
+- Bommen met kettingreacties, explosiepropagatie, breekbare muren, negen bonussen, munten,
+  teleports, levens, continues, hurry-up en de extra game met EXTRA-letters.
+- Geluid en muziek uit de originele assets, met de loop-punten uit `music/loops.txt`.
+- Online co-op: server-autoritatief, 20 snapshots per seconde, prediction op de client.
+- Vier spelers, met gegenereerde spawnpunten.
 
 ## Structuur
 
 | Pakket | Wat |
 |---|---|
-| `packages/sim` | De simulatie. **Geen DOM, geen Node-API's, geen rendering** — dit pakket draait straks óók autoritatief op de server. De tsconfig dwingt dat af met `"lib": ["ES2022"]` en `"types": []`. |
-| `packages/client` | PixiJS-renderer, input, netclient. |
-| `packages/assets` | Import-script dat de assets uit een lokale BOOM-installatie haalt. |
+| `packages/sim` | De simulatie. **Geen DOM, geen Node-API's, geen rendering** — dit pakket draait ook autoritatief op de server. De tsconfig dwingt dat af met `"lib": ["ES2022"]` en `"types": []`. |
+| `packages/client` | PixiJS-renderer, invoer, geluid, menu's, netclient. |
+| `packages/server` | Node + ws. Kamers, de autoritatieve klok, en het serveren van de gebouwde client. |
+| `packages/assets` | Import uit een lokale BOOM-installatie, plus het genereren van spawnpunten. |
 
-## Waarom het origineel wazig oogt
+Scripts: `npm test`, `npm run typecheck`, `npm run build`, `npm run server`.
 
-De game rendert 544×480 en schaalt dat bilineair op (`setSmooth(true)` in
-`GameContext.cpp:42`), op de meeste schermen ook nog met een gebroken factor. De art is prima;
-de opschaling verpest hem. Hier gebeurt het omgekeerde: nearest-neighbour, een hele
-schaalfactor gerekend in *device*-pixels, en sprite-posities afgerond op hele game-pixels.
-Zie `packages/client/src/render/scaling.ts`.
+## Twee dingen die het gedrag verklaren
+
+**Waarom het origineel wazig oogt.** De game rendert 544×480 en schaalt dat bilineair op
+(`setSmooth(true)` in `GameContext.cpp:42`), op de meeste schermen ook nog met een gebroken
+factor. De art is prima; de opschaling verpest hem. Hier gebeurt het omgekeerde:
+nearest-neighbour, een hele schaalfactor gerekend in *device*-pixels, en sprite-posities
+afgerond op hele game-pixels. Zie `packages/client/src/render/scaling.ts`.
+
+**Waarom vier spelers een script nodig hadden.** De originele tilemaps bevatten precies één
+`X` en één `Y` per level — over alle 80 levels samen 80 en 80. Er was fysiek geen plek
+aangewezen voor speler 3 en 4. `packages/assets/spawns.mjs` kiest er twee bij: lege tegels met
+minstens twee vrije buren, zo ver mogelijk van de bestaande spawns en niet naast een vijand.
+Dat lukt voor 77 van de 80 levels; in level 6, 65 en 66 is het te vol, daar spelen er dus
+maximaal twee mee.
 
 ## Licentie en herkomst
 
 - Broncode van lifish: vrij te forken en te wijzigen, **niet-commercieel**, met bronvermelding.
   Zie https://github.com/silverweed/lifish.
 - De assets (graphics, muziek, geluiden) zijn IP van **Factor Software** en zijn nergens
-  vrijgegeven. Ze staan daarom bewust niet in deze repo en worden niet herdistribueerd.
+  vrijgegeven. Ze staan daarom bewust niet in deze repo en worden niet herdistribueerd. Wie
+  dit ergens neerzet, doet dat achter een kamercode en zonder er geld aan te verdienen.

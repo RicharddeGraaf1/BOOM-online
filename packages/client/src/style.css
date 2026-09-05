@@ -1,7 +1,18 @@
+/*
+ * Het spel zelf tekent in zijn eigen 640x480-canvas; deze stylesheet is voor alles eromheen:
+ * de menu's, de wachtkamer en de statusregel. Kleuren komen uit de assets van BOOM zelf —
+ * een Mac-game uit 1997, dus vrijwel alles is een veelvoud van 0x33.
+ */
+
 :root {
 	color-scheme: dark;
-	--ink: #cfd3da;
-	--dim: #6a707a;
+	--ground: #0a0b0d;
+	--panel: #17140e;
+	--line: #322b1c;
+	--ink: #ece5d5;
+	--dim: #928872;
+	--amber: #ffcc00;
+	--hot: #ff3300;
 }
 
 * {
@@ -15,9 +26,9 @@ body {
 
 body {
 	margin: 0;
-	background: #0a0b0d;
+	background: var(--ground);
 	color: var(--ink);
-	font: 12px/1.5 ui-monospace, "Cascadia Mono", Menlo, Consolas, monospace;
+	font: 13px/1.5 ui-monospace, "Cascadia Mono", Menlo, Consolas, monospace;
 	display: flex;
 	flex-direction: column;
 	overflow: hidden;
@@ -31,31 +42,251 @@ body {
 }
 
 /*
- * De canvas-backingstore is exact 640*S bij 480*S device-pixels; de CSS-maat wordt in JS
- * gezet op backingstore / devicePixelRatio. Eén game-pixel is daarmee precies S device-pixels.
- * `pixelated` is hier alleen een vangnet: als de browser toch nog een halve pixel moet
- * overbruggen, doet hij dat nearest-neighbour in plaats van bilineair.
+ * De backingstore is exact 640*S bij 480*S device-pixels en de CSS-maat wordt in JS gezet op
+ * backingstore / devicePixelRatio. Eén spelpixel is daarmee precies S device-pixels.
+ * `pixelated` is een vangnet voor de laatste halve pixel die een browser soms overbrugt.
  */
 #stage canvas {
 	display: block;
 	image-rendering: pixelated;
 }
 
+/* ── Menu's ─────────────────────────────────────────────────────────── */
+
+#overlay {
+	position: fixed;
+	inset: 0;
+	display: grid;
+	place-items: center;
+	background: rgb(6 6 8 / 0.82);
+	backdrop-filter: blur(2px);
+	z-index: 10;
+}
+
+#overlay[hidden] {
+	display: none !important;
+}
+
+.panel {
+	width: min(92vw, 460px);
+	max-height: 88vh;
+	overflow-y: auto;
+	background: var(--panel);
+	border: 1px solid var(--line);
+	border-top: 2px solid var(--amber);
+	padding: 26px 28px 24px;
+	display: flex;
+	flex-direction: column;
+	gap: 18px;
+}
+
+.panel[hidden] {
+	display: none !important;
+}
+
+h1 {
+	margin: 0;
+	font-size: 40px;
+	letter-spacing: 0.06em;
+	line-height: 1;
+	color: var(--amber);
+}
+
+h1 span {
+	display: block;
+	font-size: 15px;
+	letter-spacing: 0.42em;
+	color: var(--dim);
+	margin-top: 6px;
+}
+
+h2 {
+	margin: 0;
+	font-size: 18px;
+	color: var(--amber);
+	letter-spacing: 0.04em;
+}
+
+p {
+	margin: 0;
+}
+
+.hint {
+	color: var(--dim);
+	font-size: 12px;
+}
+
+.error {
+	color: var(--hot);
+	font-size: 12px;
+	min-height: 1em;
+}
+
+.menu {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.menu.row {
+	flex-direction: row;
+	flex-wrap: wrap;
+}
+
+button {
+	font: inherit;
+	color: var(--ink);
+	background: #221d13;
+	border: 1px solid var(--line);
+	padding: 10px 14px;
+	text-align: left;
+	cursor: pointer;
+	transition: background 120ms ease, border-color 120ms ease;
+}
+
+.menu.row button {
+	flex: 1;
+	text-align: center;
+	min-width: 120px;
+}
+
+button:hover:not(:disabled) {
+	background: #2c2517;
+	border-color: var(--amber);
+}
+
+button:disabled {
+	opacity: 0.45;
+	cursor: default;
+}
+
+label {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	color: var(--dim);
+	font-size: 12px;
+}
+
+input[type="text"],
+#room-code,
+#lobby-link {
+	font: inherit;
+	color: var(--ink);
+	background: #0e0c08;
+	border: 1px solid var(--line);
+	padding: 10px 12px;
+	width: 100%;
+}
+
+#room-code {
+	font-size: 24px;
+	letter-spacing: 0.4em;
+	text-transform: uppercase;
+	text-align: center;
+}
+
+.link-row {
+	display: flex;
+	gap: 8px;
+	align-items: stretch;
+}
+
+.link-row button {
+	flex: 0 0 auto;
+}
+
+fieldset {
+	border: 1px solid var(--line);
+	padding: 12px 14px;
+	margin: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+legend {
+	color: var(--amber);
+	font-size: 11px;
+	letter-spacing: 0.16em;
+	text-transform: uppercase;
+	padding: 0 6px;
+}
+
+label.radio {
+	flex-direction: row;
+	align-items: flex-start;
+	gap: 10px;
+	color: var(--ink);
+	cursor: pointer;
+}
+
+label.radio b {
+	color: var(--amber);
+	font-weight: 500;
+}
+
+label.slider {
+	flex-direction: row;
+	align-items: center;
+	gap: 12px;
+}
+
+label.slider input {
+	flex: 1;
+	accent-color: var(--amber);
+}
+
+ul {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+li {
+	display: flex;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 8px 10px;
+	border: 1px solid var(--line);
+	background: #0e0c08;
+}
+
+li .state {
+	color: var(--dim);
+}
+
+li .state.ready {
+	color: #4fbf5c;
+}
+
+/* ── Statusregel ────────────────────────────────────────────────────── */
+
 #hud {
 	flex: 0 0 auto;
 	display: flex;
 	gap: 1.5rem;
 	align-items: baseline;
-	padding: 0.5rem 0.75rem;
+	padding: 6px 10px;
 	border-top: 1px solid #1c1f24;
 	background: #101216;
+	font-size: 12px;
 }
 
 #hud .hint {
 	margin-left: auto;
-	color: var(--dim);
 }
 
-#hud-scale {
-	color: var(--dim);
+:where(button, input, a):focus-visible {
+	outline: 2px solid var(--amber);
+	outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	* {
+		transition: none !important;
+	}
 }

@@ -3,7 +3,9 @@
 Doel: BOOM (de remake die nu op `D:\BOOM\windowsx64` staat) kraakhelder in de browser,
 speelbaar met z'n tweeën over internet via een gedeelde link.
 
-Status: plan, nog geen code. Opgesteld 2026-09-05.
+Status: **alle fasen uitgevoerd** — zie [README.md](../README.md) voor wat er nu draait.
+Opgesteld 2026-09-05, uitgevoerd op dezelfde dag. Dit document is het oorspronkelijke plan;
+de afwijkingen die tijdens het bouwen bleken staan hieronder per fase genoteerd.
 
 ---
 
@@ -115,6 +117,12 @@ per speler. Verwaarloosbaar.
 
 Doel: exact dezelfde pixelart, maar scherp. Geen upscaling, geen filters, geen nieuwe art.
 
+**Zo is het gelopen.** Hier is één ding bij gekomen dat niet in het plan stond: een tweede
+beeldmodus. Kraakheldere pixels blijven blokkerig op een groot scherm, en dat bleek niet te
+zijn wat er bedoeld werd met "scherper". De modus **glad** schaalt de art 4x op met Scale2x —
+een algoritme dat alleen bij diagonale randen subpixels invult en nooit een kleur verzint die
+niet in het origineel zat — en filtert die lineair. De originele modus blijft gewoon staan.
+
 1. **Nearest-neighbour overal.** In PixiJS: `scaleMode = 'nearest'` als globale default.
    Dit alleen al is het grootste deel van het verschil.
 2. **Integer scaling met letterbox.** Render logisch op 640×480, kies de grootste hele
@@ -153,35 +161,41 @@ De PNG's gaan ongewijzigd mee — ze zijn al pixel-perfect. Wat er moet gebeuren
 
 Elke fase eindigt op iets dat je kunt openen en zien werken.
 
-### Fase 0 — Fundament
+### Fase 0 — Fundament · **af**
 Monorepo opzetten, asset-pipeline, renderer. Level 1 statisch in beeld: achtergrond, border,
 muren, breekbare blokken, munten — pixel-perfect en scherp op elk scherm.
 *Klein. Dit is het moment waarop je meteen ziet dat het scherpteprobleem opgelost is.*
 
-### Fase 1 — Speelbare kern, solo, offline
+### Fase 1 — Speelbare kern, solo, offline · **af**
 Speler-beweging op het grid, bommen leggen, explosiepropagatie, breekbare muren, de 9
 bonussen, munten, teleports, level-overgang, zijpaneel/HUD. Constanten letterlijk uit
 `src/lifish/conf/`.
 **Deliverable: de eerste ~10 levels solo uitspeelbaar in de browser.**
 *Middelgroot. Dit is waar het gevoel van de game gemaakt of gebroken wordt.*
 
-### Fase 2 — Vijanden en bosses
+### Fase 2 — Vijanden en bosses · **af**
 10 vijandtypes met hun AI en schietgedrag (port van `ai_functions.cpp` +
 `src/lifish/entities/Enemy.cpp`), de alien boss en de big alien boss, eieren/spawning.
 **Deliverable: alle 80 levels solo uitspeelbaar.**
 *Groot, maar goed af te bakenen — vijand voor vijand.*
 
-### Fase 3 — Online co-op (2 spelers)
+### Fase 3 — Online co-op · **af, en voor vier spelers**
 `sim` splitsen naar server, room-manager, lobby met deelbare link/room-code, input-protocol,
 snapshots, prediction en interpolatie, reconnect, pauze bij disconnect. Deployen op Railway.
 **Deliverable: jij en een vriend spelen de campagne samen via een URL.**
 *Groot. Het echte werk zit in prediction/reconciliation goed krijgen, niet in de sockets.*
 
-### Fase 4 — Politoer
+**Zo is het gelopen.** De client draait de volledige simulatie mee en overschrijft die op elke
+snapshot; alleen voor de eigen speler wordt een afwijking onder een halve tegel genegeerd, zodat
+je poppetje niet twintig keer per seconde een sprongetje maakt. Client en server kiezen hun
+levelset in dezelfde volgorde (`levels4p.json`, anders `levels.json`) — een verschil daar zou
+meteen een desync geven.
+
+### Fase 4 — Politoer · **af**
 Geluid (64 effecten) en muziek (8 tracks met loop-punten uit `music/loops.txt`), menu's,
 opties, opslaan/laden (server-side of localStorage), levens en continues, scores.
 
-### Fase 5 — 4 spelers (later, apart besluit)
+### Fase 5 — 4 spelers · **af**
 Twee echte problemen, geen van beide technisch:
 - **Spawnpunten.** Er is er precies één per speler per level. Oplossing: een script dat per
   level twee extra vrije tegels kiest op maximale afstand van `X` en `Y`, met handmatige
@@ -189,7 +203,13 @@ Twee echte problemen, geen van beide technisch:
 - **Balans.** Vier spelers met vier bommensets maken de originele levels triviaal. Vereist
   schaling van vijand-HP/aantallen, of aangepaste levels.
 
-Advies: pas oppakken als fase 3 daadwerkelijk leuk speelt.
+**Zo is het gelopen.** `packages/assets/spawns.mjs` kiest per level twee extra spawns: lege
+tegels met minstens twee vrije buren, zo ver mogelijk van `X`, `Y` en van elkaar, en niet
+binnen drie tegels van een vijand. Dat lukt voor 77 van de 80 levels; in level 6, 65 en 66
+is het te vol en spelen er maximaal twee mee. Speler 3 en 4 lenen de sprites van speler 1 en
+2 met een eigen tint — nieuwe art tekenen zou betekenen dat we toevoegen aan een set die niet
+van ons is. De balansronde is er bewust nog niet: met vier spelers zijn de originele levels
+inderdaad makkelijker, en of dat erg is hangt af van hoe het speelt.
 
 ---
 
