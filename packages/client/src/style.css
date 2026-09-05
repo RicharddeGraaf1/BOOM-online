@@ -1,0 +1,61 @@
+:root {
+	color-scheme: dark;
+	--ink: #cfd3da;
+	--dim: #6a707a;
+}
+
+* {
+	box-sizing: border-box;
+}
+
+html,
+body {
+	height: 100%;
+}
+
+body {
+	margin: 0;
+	background: #0a0b0d;
+	color: var(--ink);
+	font: 12px/1.5 ui-monospace, "Cascadia Mono", Menlo, Consolas, monospace;
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+}
+
+#stage {
+	flex: 1;
+	display: grid;
+	place-items: center;
+	min-height: 0;
+}
+
+/*
+ * De canvas-backingstore is exact 640*S bij 480*S device-pixels; de CSS-maat wordt in JS
+ * gezet op backingstore / devicePixelRatio. Eén game-pixel is daarmee precies S device-pixels.
+ * `pixelated` is hier alleen een vangnet: als de browser toch nog een halve pixel moet
+ * overbruggen, doet hij dat nearest-neighbour in plaats van bilineair.
+ */
+#stage canvas {
+	display: block;
+	image-rendering: pixelated;
+}
+
+#hud {
+	flex: 0 0 auto;
+	display: flex;
+	gap: 1.5rem;
+	align-items: baseline;
+	padding: 0.5rem 0.75rem;
+	border-top: 1px solid #1c1f24;
+	background: #101216;
+}
+
+#hud .hint {
+	margin-left: auto;
+	color: var(--dim);
+}
+
+#hud-scale {
+	color: var(--dim);
+}

@@ -1,0 +1,7 @@
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Assets zijn IP van Factor Software en horen niet in git.
+# Haal ze binnen met: npm run assets:import
+packages/client/public/assets/
