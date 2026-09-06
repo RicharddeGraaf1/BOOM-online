@@ -21,6 +21,7 @@ import {
 	parseLevelSet,
 	type ClientMessage,
 	type LevelSet,
+	type LevelSets,
 	type RawLevelSet,
 	type ServerMessage,
 } from '@boom/sim';
@@ -44,29 +45,38 @@ const MIME: Record<string, string> = {
 
 // ── Levels ──────────────────────────────────────────────────────────────
 
-async function loadLevelSet(): Promise<LevelSet> {
-	// levels4p.json eerst: dat is dezelfde set plus de spawnpunten voor speler 3 en 4, en
-	// voor één of twee spelers gedraagt hij zich identiek. De client kiest in dezelfde
-	// volgorde — een verschil hier zou meteen een desync opleveren.
+/** Zoekt een levelset op de plekken waar hij kan staan, in volgorde. */
+async function findSet(name: string, override?: string): Promise<LevelSet | undefined> {
 	const candidates = [
-		process.env.BOOM_LEVELS,
-		join(CLIENT_DIST, 'assets', 'levels4p.json'),
-		join(CLIENT_DIST, 'assets', 'levels.json'),
-		resolve(HERE, '../../client/public/assets/levels4p.json'),
-		resolve(HERE, '../../client/public/assets/levels.json'),
+		override,
+		join(CLIENT_DIST, 'assets', name),
+		resolve(HERE, '../../client/public/assets', name),
 	].filter((c): c is string => Boolean(c));
 
 	for (const path of candidates) {
 		if (!existsSync(path)) continue;
 		const raw = JSON.parse(await readFile(path, 'utf8')) as RawLevelSet;
-		console.log(`[boom] levels geladen uit ${path} (${raw.levels.length} levels)`);
+		console.log(`[boom] ${name}: ${raw.levels.length} levels uit ${path}`);
 		return parseLevelSet(raw);
 	}
+	return undefined;
+}
 
-	throw new Error(
-		'Geen levels.json gevonden. Draai `npm run assets:import` of zet BOOM_LEVELS.\nGezocht in:\n  ' +
-			candidates.join('\n  '),
-	);
+/**
+ * Beide sets laden. Tot twee spelers wordt de originele gespeeld; pas vanaf drie is de set
+ * met de extra spawnpunten nodig. De keuze zelf valt in @boom/sim, zodat de server en elke
+ * browser hem op dezelfde manier maken — daar zou een verschil meteen een desync opleveren.
+ */
+async function loadLevelSets(): Promise<LevelSets> {
+	const original = await findSet('levels.json', process.env.BOOM_LEVELS);
+	if (!original)
+		throw new Error('Geen levels.json gevonden. Draai `npm run assets:import` of zet BOOM_LEVELS.');
+
+	const fourPlayer = await findSet('levels4p.json');
+	if (!fourPlayer)
+		console.log('[boom] geen levels4p.json — meer dan twee spelers is niet mogelijk');
+
+	return fourPlayer ? { original, fourPlayer } : { original };
 }
 
 // ── Statische bestanden ─────────────────────────────────────────────────
@@ -112,7 +122,7 @@ function newRoomCode(rooms: Map<string, Room>): string {
 }
 
 async function main(): Promise<void> {
-	const levelSet = await loadLevelSet();
+	const sets = await loadLevelSets();
 	const rooms = new Map<string, Room>();
 
 	const http = createServer(serveStatic);
@@ -141,7 +151,7 @@ async function main(): Promise<void> {
 
 					let target = rooms.get(code);
 					if (!target) {
-						target = new Room(code, levelSet);
+						target = new Room(code, sets);
 						rooms.set(code, target);
 					}
 

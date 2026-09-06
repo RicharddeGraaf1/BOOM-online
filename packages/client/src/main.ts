@@ -12,6 +12,7 @@ import {
 	bombsAvailable,
 	parseLevelSet,
 	type LevelSet,
+	type LevelSets,
 	type PlayerInput,
 	type RawLevelSet,
 	type World,
@@ -79,27 +80,30 @@ function fail(message: string): never {
 	throw new Error(message);
 }
 
-/**
- * Bij voorkeur levels4p.json: dat is de originele set plus de gegenereerde spawnpunten voor
- * speler 3 en 4 (packages/assets/spawns.mjs). Voor één of twee spelers verandert die set
- * niets — de extra spawns worden dan simpelweg niet gebruikt. De server kiest op dezelfde
- * manier, want client en server moeten aan hetzelfde level rekenen.
- */
-async function loadLevelSet(): Promise<LevelSet> {
-	const asked = new URLSearchParams(location.search).get('levels');
-	const order = asked && /^[\w.-]+$/.test(asked) ? [asked] : ['levels4p.json', 'levels.json'];
+async function fetchSet(file: string): Promise<LevelSet | undefined> {
+	const res = await fetch(`assets/${file}`);
+	if (!res.ok) return undefined;
+	return parseLevelSet((await res.json()) as RawLevelSet);
+}
 
-	for (const file of order) {
-		const res = await fetch(`assets/${file}`);
-		if (res.ok) return parseLevelSet((await res.json()) as RawLevelSet);
-	}
-	throw new Error(`geen levelset gevonden (gezocht: ${order.join(', ')})`);
+/**
+ * Beide sets laden. Tot twee spelers speel je de originele maps, precies zoals ze zijn; pas
+ * vanaf drie schakelt de sim over naar de set met de gegenereerde spawnpunten
+ * (packages/assets/spawns.mjs). Die keuze valt in @boom/sim, zodat de browser en de server
+ * hem op dezelfde manier maken.
+ */
+async function loadLevelSets(): Promise<LevelSets> {
+	const original = await fetchSet('levels.json');
+	if (!original) throw new Error('assets/levels.json ontbreekt');
+
+	const fourPlayer = await fetchSet('levels4p.json');
+	return fourPlayer ? { original, fourPlayer } : { original };
 }
 
 async function boot(): Promise<void> {
-	let levelSet: LevelSet;
+	let sets: LevelSets;
 	try {
-		levelSet = await loadLevelSet();
+		sets = await loadLevelSets();
 	} catch (e) {
 		fail(
 			`${e instanceof Error ? e.message : String(e)}\n\n` +
@@ -214,7 +218,11 @@ async function boot(): Promise<void> {
 		mode = 'local';
 		net?.disconnect();
 		net = null;
-		game = new Game(levelSet, nPlayers);
+		game = new Game({
+			levelSet: sets.original,
+			...(sets.fourPlayer ? { fourPlayerSet: sets.fourPlayer } : {}),
+			nPlayers,
+		});
 		paused = false;
 		await audio.unlock();
 		show('none');
@@ -224,7 +232,7 @@ async function boot(): Promise<void> {
 	function startOnline(room: string): void {
 		mode = 'online';
 		game = null;
-		net = new NetClient(levelSet, {
+		net = new NetClient(sets, {
 			onPhase: (phase, detail) => {
 				if (phase === 'lobby') {
 					show('lobby');
@@ -490,10 +498,7 @@ async function boot(): Promise<void> {
 
 	// Zonder gegenereerde spawnpunten kunnen speler 3 en 4 nergens staan. Dan die knoppen
 	// niet aanbieden, in plaats van ze te laten mislukken zonder uitleg.
-	const hasExtraSpawns = levelSet.levels.some((l) =>
-		l.cells.some((c) => c.kind === 'player3'),
-	);
-	if (!hasExtraSpawns) {
+	if (!sets.fourPlayer) {
 		for (const btn of document.querySelectorAll<HTMLButtonElement>('[data-players]')) {
 			if (Number(btn.dataset['players']) <= 2) continue;
 			btn.disabled = true;

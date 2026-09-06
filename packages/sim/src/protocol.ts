@@ -11,6 +11,7 @@
  */
 
 import type { Entity, GameEvent, PlayerInput, PlayerState, World, WorldStatus } from './types.js';
+import type { LevelSetVariant } from './game.js';
 
 export const SNAPSHOT_HZ = 20;
 export const PROTOCOL_VERSION = 1;
@@ -51,7 +52,15 @@ export interface Snapshot {
 export type ServerMessage =
 	| { t: 'welcome'; playerId: number; room: string; version: number }
 	| { t: 'lobby'; members: LobbyMember[]; host: number }
-	| { t: 'level'; levelNum: number; seed: number; nPlayers: number; players: PlayerState[] }
+	| {
+			t: 'level';
+			levelNum: number;
+			seed: number;
+			nPlayers: number;
+			players: PlayerState[];
+			/** Welke levelset de server speelt; de client moet dezelfde nemen of het loopt uiteen. */
+			variant: LevelSetVariant;
+	  }
 	| { t: 'snap'; snap: Snapshot }
 	| { t: 'error'; message: string };
 

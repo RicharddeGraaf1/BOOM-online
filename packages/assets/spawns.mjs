@@ -176,7 +176,7 @@ async function main() {
 		);
 	if (failed.length) console.log(`Niet gelukt voor level: ${failed.join(', ')}`);
 	console.log(`Geschreven naar ${TARGET}`);
-	console.log('Kies deze set in het spel met ?levels=levels4p.json');
+	console.log('Het spel schakelt hier vanzelf op over zodra er een derde speler meedoet.');
 }
 
 await main();

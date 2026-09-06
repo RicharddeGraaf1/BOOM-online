@@ -6,7 +6,7 @@
  * invoer — nooit posities.
  */
 
-import { MAX_PLAYERS, NO_INPUT, newPlayerState, type LevelSet, type PlayerInput } from '@boom/sim';
+import { MAX_PLAYERS, NO_INPUT, newPlayerState, type LevelSets, type PlayerInput } from '@boom/sim';
 import { Game, SNAPSHOT_HZ, takeSnapshot, type ServerMessage } from '@boom/sim';
 
 
@@ -33,16 +33,16 @@ export class Room {
 	started = false;
 	emptySince: number | null = Date.now();
 
-	private readonly levelSet: LevelSet;
+	private readonly sets: LevelSets;
 	private timer: NodeJS.Timeout | null = null;
 	private tickCount = 0;
 	private lastTick = 0;
 	/** De wereld waarover we het laatst een `level`-bericht stuurden. */
 	private announcedWorld: unknown = null;
 
-	constructor(code: string, levelSet: LevelSet) {
+	constructor(code: string, sets: LevelSets) {
 		this.code = code;
-		this.levelSet = levelSet;
+		this.sets = sets;
 	}
 
 	/** Geeft het laagste vrije speler-id, of null als de kamer vol zit. */
@@ -115,7 +115,13 @@ export class Room {
 
 		const seed = (Math.random() * 0x7fffffff) | 0;
 		const players = [1, 2, 3, 4].map((id) => newPlayerState(id, this.members.has(id)));
-		this.game = new Game(this.levelSet, this.members.size, 1, seed, players);
+		this.game = new Game({
+			levelSet: this.sets.original,
+			...(this.sets.fourPlayer ? { fourPlayerSet: this.sets.fourPlayer } : {}),
+			players,
+			seed,
+			startLevel: 1,
+		});
 		this.announceLevel();
 
 		this.lastTick = Date.now();
@@ -137,6 +143,7 @@ export class Room {
 			seed: 0,
 			nPlayers: game.nPlayers,
 			players: game.players.map((p) => ({ ...p, letters: [...p.letters] as never })),
+			variant: game.variant,
 		};
 	}
 

@@ -10,6 +10,7 @@
  * zijn dus altijd 1..width en 1..height, met 0 en width+1 als muur.
  */
 
+import { bomb as BOMB, player as PLAYER } from './constants.js';
 import type { Direction } from './direction.js';
 import type { Rng } from './rng.js';
 import type { RawEnemy } from './levelset.js';
@@ -142,6 +143,16 @@ export interface PlayerState {
 	out: boolean;
 	/** verbonden speler in een online sessie; solo is dit altijd waar voor speler 1 */
 	present: boolean;
+}
+
+/** De krachten waarmee een speler begint, en waarop hij bij dood terugvalt. */
+export function defaultPowers(): PlayerState['powers'] {
+	return {
+		// src/lifish/entities/Player.hpp:19-24 — je begint met vijf bommen, niet met één.
+		maxBombs: PLAYER.DEFAULT_MAX_BOMBS,
+		bombRadius: BOMB.DEFAULT_RADIUS,
+		bombFuseTime: BOMB.DEFAULT_FUSE,
+	};
 }
 
 export type GameEvent =

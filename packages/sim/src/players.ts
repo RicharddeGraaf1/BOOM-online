@@ -10,7 +10,7 @@ import { SCORE, addScore, sound } from './events.js';
 import { makeBomb, spawn } from './entities.js';
 import { applyBonus } from './combat.js';
 import { teleportStep } from './teleport.js';
-import type { Entity, PlayerInput, World } from './types.js';
+import { defaultPowers, type Entity, type PlayerInput, type World } from './types.js';
 
 /** Hoe dicht twee 32x32-entities op elkaar moeten staan om als "aanraking" te tellen. */
 const PICKUP_DIST = 20;
@@ -138,6 +138,13 @@ export function hurtPlayer(w: World, player: Entity, damage: number): void {
 		player.deadT = 0;
 		player.moving = false;
 		player.dir = Dir.NONE;
+		player.dash = 0;
+
+		// Bij sterven raak je je opgeraapte krachten kwijt, maar niet je EXTRA-letters.
+		// src/lifish/entities/Player.cpp:157-161 (`info.reset(false)`).
+		const ps = w.players[(player.playerId ?? 1) - 1];
+		if (ps) ps.powers = defaultPowers();
+
 		sound(w, `player${player.playerId ?? 1}_death.ogg`);
 	} else {
 		player.shieldT = PLAYER.DAMAGE_SHIELD_TIME;

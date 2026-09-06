@@ -16,7 +16,7 @@ BOOM-installatie nodig.
 ```sh
 npm install
 npm run assets:import      # zoekt o.a. D:/BOOM/windowsx64/assets
-npm run spawns             # spawnpunten voor speler 3 en 4 (optioneel)
+npm run spawns             # spawnpunten voor speler 3 en 4 (nodig vanaf drie spelers)
 npm run dev                # solo en lokale co-op
 ```
 
@@ -90,6 +90,13 @@ Scripts: `npm test`, `npm run typecheck`, `npm run build`, `npm run server`.
 factor. De art is prima; de opschaling verpest hem. Hier gebeurt het omgekeerde:
 nearest-neighbour, een hele schaalfactor gerekend in *device*-pixels, en sprite-posities
 afgerond op hele game-pixels. Zie `packages/client/src/render/scaling.ts`.
+
+**Welke maps er gespeeld worden.** Tot twee spelers de originele, ongewijzigd. Pas vanaf
+drie schakelt het spel over naar `levels4p.json` — en dan bij de levelwissel, niet halverwege
+een level. Die keuze valt in `@boom/sim`, zodat de browser en de server hem op precies dezelfde
+manier maken; een verschil daar zou meteen een desync geven. Het `level`-bericht draagt de
+gekozen set mee, zodat een client die `levels4p.json` mist een nette foutmelding krijgt in
+plaats van stilletjes aan een ander level te rekenen.
 
 **Waarom vier spelers een script nodig hadden.** De originele tilemaps bevatten precies één
 `X` en één `Y` per level — over alle 80 levels samen 80 en 80. Er was fysiek geen plek

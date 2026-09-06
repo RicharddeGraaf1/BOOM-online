@@ -21,8 +21,42 @@ const MAX_CATCHUP = 0.25;
 
 export type Phase = 'playing' | 'interlevel' | 'gameover';
 
+/** Welke levelset er gespeeld wordt. */
+export type LevelSetVariant = 'original' | 'fourPlayer';
+
+export interface LevelSets {
+	/** De originele 80 levels, ongewijzigd. */
+	original: LevelSet;
+	/** Dezelfde levels plus gegenereerde spawnpunten voor speler 3 en 4. */
+	fourPlayer?: LevelSet;
+}
+
+/**
+ * Tot twee spelers spelen we de originele maps, precies zoals Factor Software ze maakte.
+ * Pas vanaf drie is er een set nodig met extra spawnpunten, want de originele tilemaps
+ * hebben er maar twee.
+ *
+ * Deze keuze moet op de server en in elke browser hetzelfde uitpakken — hij hangt daarom
+ * alleen af van het aantal spelers, en niet van wat er toevallig lokaal beschikbaar is.
+ */
+export function variantFor(nPlayers: number, sets: LevelSets): LevelSetVariant {
+	return nPlayers >= 3 && sets.fourPlayer ? 'fourPlayer' : 'original';
+}
+
+export interface GameOptions {
+	levelSet: LevelSet;
+	/** Alleen nodig vanaf drie spelers. */
+	fourPlayerSet?: LevelSet;
+	nPlayers?: number;
+	/** Bestaande spelerstand overnemen; de netclient gebruikt dit. */
+	players?: PlayerState[];
+	startLevel?: number;
+	seed?: number;
+}
+
 export class Game {
-	readonly levelSet: LevelSet;
+	readonly sets: LevelSets;
+	variant: LevelSetVariant;
 	players: PlayerState[];
 	world: World;
 	phase: Phase = 'playing';
@@ -42,18 +76,23 @@ export class Game {
 	 * `players` meegeven is voor de netclient: die moet exact de spelerstand van de server
 	 * overnemen vóórdat de wereld gebouwd wordt, want daaraan hangt wie er spawnt.
 	 */
-	constructor(
-		levelSet: LevelSet,
-		nPlayers: number,
-		startLevel = 1,
-		seed = Date.now() | 0,
-		players?: PlayerState[],
-	) {
-		this.levelSet = levelSet;
-		this.seed = seed;
-		const count = Math.max(1, Math.min(MAX_PLAYERS, nPlayers));
-		this.players = players ?? [1, 2, 3, 4].map((id) => newPlayerState(id, id <= count));
-		this.world = createWorld(levelSet, startLevel, this.players, { seed });
+	constructor(options: GameOptions) {
+		this.sets = { original: options.levelSet, ...(options.fourPlayerSet ? { fourPlayer: options.fourPlayerSet } : {}) };
+		this.seed = options.seed ?? Date.now() | 0;
+
+		const count = Math.max(1, Math.min(MAX_PLAYERS, options.nPlayers ?? 1));
+		this.players =
+			options.players ?? [1, 2, 3, 4].map((id) => newPlayerState(id, id <= count));
+
+		this.variant = variantFor(this.nPlayers, this.sets);
+		this.world = createWorld(this.levelSet, options.startLevel ?? 1, this.players, {
+			seed: this.seed,
+		});
+	}
+
+	/** De set die nu gespeeld wordt. */
+	get levelSet(): LevelSet {
+		return (this.variant === 'fourPlayer' ? this.sets.fourPlayer : undefined) ?? this.sets.original;
 	}
 
 	/** Het aantal spelers dat nu meedoet. Afgeleid, want de bezetting kan gaten hebben. */
@@ -94,6 +133,8 @@ export class Game {
 	/** Nieuwe wereld voor hetzelfde of een volgend level, met behoud van de spelerstand. */
 	loadLevel(levelNum: number): void {
 		this.applyPendingJoins();
+		// De set kan hier wisselen: komt er een derde speler bij, dan pas vanaf dit level.
+		this.variant = variantFor(this.nPlayers, this.sets);
 		this.seed = (this.seed * 1103515245 + 12345) | 0;
 		this.world = createWorld(this.levelSet, levelNum, this.players, { seed: this.seed });
 		this.phase = 'playing';
@@ -152,14 +193,17 @@ export class Game {
 
 	private finishInterlevel(): void {
 		if (this.world.status === 'retry') {
-			// Een continue kost een muntje: levens terug, score blijft staan.
+			// Een continue kost een muntje én je score: het origineel maakt een verse speler
+			// aan en roept resetScore. src/lifish/GameContext.cpp:250-263.
 			let used = false;
 			for (const ps of this.players) {
 				if (!ps.present || ps.continues <= 0) continue;
-				ps.continues--;
-				ps.remainingLives = 2;
-				ps.out = false;
-				ps.life = 16;
+				const continues = ps.continues - 1;
+				const letters = [...ps.letters] as PlayerState['letters'];
+				Object.assign(this.players[ps.id - 1]!, newPlayerState(ps.id, true), {
+					continues,
+					letters,
+				});
 				used = true;
 			}
 			if (!used) {

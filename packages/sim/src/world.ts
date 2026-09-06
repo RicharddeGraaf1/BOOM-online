@@ -18,7 +18,7 @@ import { gridIndex } from './grid.js';
 import { makeRng } from './rng.js';
 import { Tile, tileToPixel } from './tiles.js';
 import type { Level, LevelSet } from './levelset.js';
-import type { Entity, PlayerState, World } from './types.js';
+import { defaultPowers, type Entity, type PlayerState, type World } from './types.js';
 import { emit } from './events.js';
 import {
 	makeBoss,
@@ -43,14 +43,12 @@ export function newPlayerState(id: number, present: boolean): PlayerState {
 	return {
 		id,
 		score: 0,
-		remainingLives: PLAYER.INITIAL_LIVES,
+		// src/lifish/entities/Player.hpp:32 — het leven waarmee je speelt telt mee, dus
+		// INITIAL_LIVES van 3 betekent er twee in reserve.
+		remainingLives: PLAYER.INITIAL_LIVES - 1,
 		continues: PLAYER.INITIAL_CONTINUES,
 		letters: [false, false, false, false, false],
-		powers: {
-			maxBombs: 1,
-			bombRadius: BOMB.DEFAULT_RADIUS,
-			bombFuseTime: BOMB.DEFAULT_FUSE,
-		},
+		powers: defaultPowers(),
 		life: PLAYER.MAX_LIFE,
 		out: false,
 		present,

@@ -85,7 +85,7 @@ describe.skipIf(!path)('alle 80 originele levels', () => {
 		const rng = makeRng(20260905);
 
 		for (const level of set.levels) {
-			const game = new Game(set, 2, level.num, 1234);
+			const game = new Game({ levelSet: set, nPlayers: 2, startLevel: level.num, seed: 1234 });
 			const held: PlayerInput[] = [{ ...NO_INPUT }, { ...NO_INPUT }];
 
 			for (let tick = 0; tick < 180; ++tick) {
@@ -140,7 +140,7 @@ describe.skipIf(!path)('alle 80 originele levels', () => {
 	it('houdt spelers binnen het speelveld', async () => {
 		const set = await loadSet();
 		for (const num of [1, 20, 40, 60, 80]) {
-			const game = new Game(set, 1, num, 99);
+			const game = new Game({ levelSet: set, nPlayers: 1, startLevel: num, seed: 99 });
 			const input: PlayerInput = { ...NO_INPUT, right: true, down: true };
 
 			for (let tick = 0; tick < 600; ++tick) game.advance(1 / 60, [input]);

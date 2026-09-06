@@ -46,7 +46,7 @@ function member(playerId: number, sink: ServerMessage[]) {
 
 describe('Room', () => {
 	it('deelt oplopende speler-ids uit en zit vol bij vier', () => {
-		const room = new Room('TEST', levelSet());
+		const room = new Room('TEST', { original: levelSet() });
 		const sink: ServerMessage[] = [];
 
 		for (let id = 1; id <= 4; ++id) {
@@ -57,7 +57,7 @@ describe('Room', () => {
 	});
 
 	it('geeft een vrijgekomen slot opnieuw uit', () => {
-		const room = new Room('TEST', levelSet());
+		const room = new Room('TEST', { original: levelSet() });
 		const sink: ServerMessage[] = [];
 		for (let id = 1; id <= 4; ++id) room.add(member(id, sink));
 
@@ -66,7 +66,7 @@ describe('Room', () => {
 	});
 
 	it('meldt de wachtkamer aan iedereen zodra er iemand bij komt', () => {
-		const room = new Room('TEST', levelSet());
+		const room = new Room('TEST', { original: levelSet() });
 		const sink: ServerMessage[] = [];
 		room.add(member(1, sink));
 		room.add(member(2, sink));
@@ -78,7 +78,7 @@ describe('Room', () => {
 
 	it('stuurt na de start een level en daarna snapshots', async () => {
 		vi.useRealTimers();
-		const room = new Room('TEST', levelSet());
+		const room = new Room('TEST', { original: levelSet() });
 		const sink: ServerMessage[] = [];
 		room.add(member(1, sink));
 
@@ -99,7 +99,7 @@ describe('Room', () => {
 	});
 
 	it('laat een late binnenkomer meekijken en pas bij het volgende level meedoen', async () => {
-		const room = new Room('TEST', levelSet());
+		const room = new Room('TEST', { original: levelSet() });
 		const first: ServerMessage[] = [];
 		room.add(member(1, first));
 		room.start();
@@ -123,7 +123,7 @@ describe('Room', () => {
 	});
 
 	it('haalt een vertrekkende speler meteen uit het veld', () => {
-		const room = new Room('TEST', levelSet());
+		const room = new Room('TEST', { original: levelSet() });
 		const sink: ServerMessage[] = [];
 		room.add(member(1, sink));
 		room.add(member(2, sink));
@@ -140,7 +140,7 @@ describe('Room', () => {
 	});
 
 	it('stopt de klok zodra de laatste speler weg is', async () => {
-		const room = new Room('TEST', levelSet());
+		const room = new Room('TEST', { original: levelSet() });
 		const sink: ServerMessage[] = [];
 		room.add(member(1, sink));
 		room.start();

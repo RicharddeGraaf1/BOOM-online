@@ -15,7 +15,7 @@ import {
 	applySnapshot,
 	reconcileLocalPlayer,
 	type ClientMessage,
-	type LevelSet,
+	type LevelSets,
 	type PlayerInput,
 	type PlayerState,
 	type ServerMessage,
@@ -42,12 +42,12 @@ export class NetClient {
 	game: Game | null = null;
 
 	private ws: WebSocket | null = null;
-	private readonly levelSet: LevelSet;
+	private readonly sets: LevelSets;
 	private readonly handlers: NetHandlers;
 	private lastSent = '';
 
-	constructor(levelSet: LevelSet, handlers: NetHandlers) {
-		this.levelSet = levelSet;
+	constructor(sets: LevelSets, handlers: NetHandlers) {
+		this.sets = sets;
 		this.handlers = handlers;
 	}
 
@@ -124,7 +124,19 @@ export class NetClient {
 				const players = msg.players.map(
 					(p) => ({ ...p, letters: [...p.letters] }) as PlayerState,
 				);
-				const game = new Game(this.levelSet, msg.nPlayers, msg.levelNum, 1, players);
+				if (msg.variant === 'fourPlayer' && !this.sets.fourPlayer) {
+					// Zonder dezelfde set rekenen we aan een ander level dan de server.
+					this.setPhase('error', 'levels4p.json ontbreekt — draai `npm run spawns`');
+					break;
+				}
+
+				const game = new Game({
+					levelSet: this.sets.original,
+					...(this.sets.fourPlayer ? { fourPlayerSet: this.sets.fourPlayer } : {}),
+					players,
+					startLevel: msg.levelNum,
+					seed: 1,
+				});
 				this.game = game;
 				this.setPhase('playing');
 				this.handlers.onLevel(game);
