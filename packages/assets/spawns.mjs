@@ -7,14 +7,22 @@
  * speler 3 en 4. Dit script kiest er twee bij, met dezelfde criteria die een levelontwerper
  * zou hanteren:
  *
- *   - de tegel is leeg (geen muur, munt, teleport, vijand of boss);
- *   - de tegel heeft minstens twee vrije buren, zodat je niet vastzit bij de start;
+ *   - de tegel is leeg;
+ *   - de tegel heeft minstens twee begaanbare buren, zodat je niet vastzit bij de start;
  *   - hij ligt zo ver mogelijk van de bestaande spawns én van elkaar;
- *   - er staat geen vijand binnen twee tegels.
+ *   - er staat bij voorkeur geen vijand vlakbij.
  *
- * Het resultaat gaat naar levels4p.json; het origineel wordt niet aangeraakt. Wat dit script
- * NIET doet is balanceren — vier spelers met vier bommensets maken de originele levels een
- * stuk makkelijker. Daar zit de `--enemy-scale` knop voor, die de vijandsnelheid meeschaalt.
+ * Dat laatste is een voorkeur en geen eis. In een level als 6 staan dertien vijanden op
+ * 195 tegels; daar is geen enkele plek drie tegels van alles vandaan, ook de originele
+ * spawns niet. Het script zakt daarom net zo lang in eisen tot er twee plekken overblijven,
+ * en meldt per level welke drempel het gehaald heeft.
+ *
+ * Het resultaat gaat naar levels4p.json; levels.json blijft ongemoeid. Er wordt uitsluitend
+ * op lege tegels geschreven, dus geen munt, teleport, muur of vijand raakt kwijt — dat wordt
+ * ook als test afgedwongen.
+ *
+ * Wat dit script NIET doet is balanceren: vier spelers met vier bommensets maken de originele
+ * levels een stuk makkelijker. Dat is een aparte afweging.
  *
  *   node packages/assets/spawns.mjs
  *   node packages/assets/spawns.mjs --report
@@ -34,7 +42,13 @@ const TARGET = join(ASSETS, 'levels4p.json');
 const EMPTY = '0';
 const SPAWN3 = 'Z';
 const SPAWN4 = 'W';
-const BLOCKING = new Set(['1', '2', '3', '+', '*', '/']);
+/**
+ * Wat een tegel onbegaanbaar maakt: vaste en breekbare muren, en de twee bosses die
+ * meerdere tegels beslaan. Munten en teleports NIET — daar loop je gewoon overheen. Dat
+ * verschil is niet academisch: level 65 en 66 liggen bezaaid met munten, en zolang die als
+ * muur telden had daar geen enkele tegel genoeg vrije buren.
+ */
+const BLOCKING = new Set(['1', '2', '*', '/']);
 const ENEMIES = new Set(['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J']);
 
 const idx = (x, y, w) => y * w + x;
@@ -60,6 +74,9 @@ function minDistance(x, y, points) {
 	return best;
 }
 
+/** Drempels voor de afstand tot de dichtstbijzijnde vijand, van ruim naar krap. */
+const ENEMY_CLEARANCE = [3, 2, 1, 0];
+
 function pickSpawns(level) {
 	const w = level.width;
 	const h = level.height;
@@ -71,7 +88,7 @@ function pickSpawns(level) {
 		if (ENEMIES.has(tiles[i])) enemies.push({ x: i % w, y: Math.floor(i / w) });
 	}
 
-	const candidates = [];
+	const open = [];
 	for (let y = 0; y < h; ++y) {
 		for (let x = 0; x < w; ++x) {
 			if (tiles[idx(x, y, w)] !== EMPTY) continue;
@@ -80,28 +97,36 @@ function pickSpawns(level) {
 				(n) => !BLOCKING.has(tiles[idx(n[0], n[1], w)]),
 			).length;
 			if (free < 2) continue;
-			if (minDistance(x, y, enemies) < 3) continue;
 
-			candidates.push({ x, y, score: minDistance(x, y, taken) });
+			open.push({ x, y, enemyDist: minDistance(x, y, enemies) });
 		}
 	}
 
-	if (candidates.length < 2) return null;
+	// Zak in eisen tot er twee plekken overblijven. Zo krijgt een ruim level ruime spawns
+	// en een druk level in elk geval spawns.
+	for (const clearance of ENEMY_CLEARANCE) {
+		const candidates = open.filter((c) => c.enemyDist >= clearance);
+		if (candidates.length < 2) continue;
 
-	// Eerst de tegel die het verst van de bestaande spawns ligt, daarna de tegel die het
-	// verst van alles ligt wat we tot nu toe gekozen hebben.
-	candidates.sort((a, b) => b.score - a.score);
-	const third = candidates[0];
+		// Eerst de tegel die het verst van de bestaande spawns ligt; bij gelijke stand die
+		// met de meeste lucht rond zich.
+		const byDistance = (list, from) =>
+			[...list].sort((a, b) => {
+				const d = minDistance(b.x, b.y, from) - minDistance(a.x, a.y, from);
+				return d !== 0 ? d : b.enemyDist - a.enemyDist;
+			});
 
-	const rest = candidates.filter((c) => c !== third);
-	rest.sort(
-		(a, b) =>
-			minDistance(b.x, b.y, [...taken, third]) - minDistance(a.x, a.y, [...taken, third]),
-	);
-	const fourth = rest[0];
-	if (!fourth) return null;
+		const third = byDistance(candidates, taken)[0];
+		const fourth = byDistance(
+			candidates.filter((c) => c !== third),
+			[...taken, third],
+		)[0];
+		if (!fourth) continue;
 
-	return { third, fourth };
+		return { third, fourth, clearance };
+	}
+
+	return null;
 }
 
 async function main() {
@@ -116,7 +141,8 @@ async function main() {
 	const report = process.argv.includes('--report');
 
 	let done = 0;
-	let failed = [];
+	const failed = [];
+	const tight = [];
 
 	for (const level of set.levels) {
 		const picked = pickSpawns(level);
@@ -129,11 +155,13 @@ async function main() {
 		tiles[idx(picked.fourth.x, picked.fourth.y, level.width)] = SPAWN4;
 		level.tilemap = tiles.join('');
 		done++;
+		if (picked.clearance < 3) tight.push(`${level.num} (${picked.clearance})`);
 
 		if (report) {
 			console.log(
 				`level ${String(level.num).padStart(2)}: speler 3 op (${picked.third.x},${picked.third.y}), ` +
-					`speler 4 op (${picked.fourth.x},${picked.fourth.y})`,
+					`speler 4 op (${picked.fourth.x},${picked.fourth.y}), ` +
+					`vijand op ${picked.clearance} tegel${picked.clearance === 1 ? '' : 's'} afstand`,
 			);
 		}
 	}
@@ -142,6 +170,10 @@ async function main() {
 	await writeFile(TARGET, JSON.stringify(set, null, '\t') + '\n');
 
 	console.log(`${done} van de ${set.levels.length} levels voorzien van vier spawnpunten.`);
+	if (tight.length)
+		console.log(
+			`Krap, vijand dichterbij dan drie tegels — level (afstand): ${tight.join(', ')}`,
+		);
 	if (failed.length) console.log(`Niet gelukt voor level: ${failed.join(', ')}`);
 	console.log(`Geschreven naar ${TARGET}`);
 	console.log('Kies deze set in het spel met ?levels=levels4p.json');

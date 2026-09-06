@@ -57,7 +57,7 @@ Alle zes fasen uit het plan zijn af.
   teleports, levens, continues, hurry-up en de extra game met EXTRA-letters.
 - Geluid en muziek uit de originele assets, met de loop-punten uit `music/loops.txt`.
 - Online co-op: server-autoritatief, 20 snapshots per seconde, prediction op de client.
-- Vier spelers, met gegenereerde spawnpunten.
+- Vier spelers, met gegenereerde spawnpunten in alle 80 levels.
 
 ## Structuur
 
@@ -81,9 +81,13 @@ afgerond op hele game-pixels. Zie `packages/client/src/render/scaling.ts`.
 **Waarom vier spelers een script nodig hadden.** De originele tilemaps bevatten precies één
 `X` en één `Y` per level — over alle 80 levels samen 80 en 80. Er was fysiek geen plek
 aangewezen voor speler 3 en 4. `packages/assets/spawns.mjs` kiest er twee bij: lege tegels met
-minstens twee vrije buren, zo ver mogelijk van de bestaande spawns en niet naast een vijand.
-Dat lukt voor 77 van de 80 levels; in level 6, 65 en 66 is het te vol, daar spelen er dus
-maximaal twee mee.
+minstens twee begaanbare buren, zo ver mogelijk van de bestaande spawns en van elkaar, en bij
+voorkeur niet naast een vijand. Alle 80 levels krijgen zo vier spawnpunten, en er wordt
+uitsluitend op lege tegels geschreven — geen munt, teleport of muur raakt kwijt. Dat laatste
+is een test, geen belofte.
+
+In level 6 staan dertien vijanden op 195 tegels; daar is geen plek meer dan twee tegels van
+alles vandaan, ook de originele spawns niet. Het script meldt zulke krappe levels.
 
 ## Licentie en herkomst
 

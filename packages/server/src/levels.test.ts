@@ -31,9 +31,15 @@ const CANDIDATES = [
 ];
 
 const path = CANDIDATES.find((p) => existsSync(p));
+const FOUR_PLAYER = CANDIDATES[0]!;
+const ORIGINAL = CANDIDATES[1]!;
 
-async function loadSet() {
-	return parseLevelSet(JSON.parse(await readFile(path!, 'utf8')) as RawLevelSet);
+async function loadSet(file = path!) {
+	return parseLevelSet(JSON.parse(await readFile(file, 'utf8')) as RawLevelSet);
+}
+
+async function loadRaw(file: string) {
+	return JSON.parse(await readFile(file, 'utf8')) as RawLevelSet;
 }
 
 /** Willekeurige maar reproduceerbare invoer, zodat een fout terug te halen is. */
@@ -61,11 +67,16 @@ describe.skipIf(!path)('alle 80 originele levels', () => {
 
 	it('heeft precies één spawnpunt per speler per level', async () => {
 		const set = await loadSet();
+		const fourPlayer = path === FOUR_PLAYER;
+		const kinds = fourPlayer
+			? (['player1', 'player2', 'player3', 'player4'] as const)
+			: (['player1', 'player2'] as const);
+
 		for (const level of set.levels) {
-			const p1 = level.cells.filter((c) => c.kind === 'player1').length;
-			const p2 = level.cells.filter((c) => c.kind === 'player2').length;
-			expect(p1, `level ${level.num}`).toBe(1);
-			expect(p2, `level ${level.num}`).toBe(1);
+			for (const kind of kinds) {
+				const n = level.cells.filter((c) => c.kind === kind).length;
+				expect(n, `level ${level.num}, ${kind}`).toBe(1);
+			}
 		}
 	});
 
@@ -94,6 +105,37 @@ describe.skipIf(!path)('alle 80 originele levels', () => {
 			expect(game.world.entities.length, `level ${level.num}`).toBeLessThan(500);
 		}
 	}, 60_000);
+
+	/**
+	 * De spawnpunten voor speler 3 en 4 worden gegenereerd (packages/assets/spawns.mjs). Die
+	 * generator mag uitsluitend op lege tegels schrijven: zou hij een munt overschrijven, dan
+	 * zou de extra game in dat level niet meer te halen zijn, en een teleport of muur weghalen
+	 * verandert het level echt. Dit is de test die dat vastlegt.
+	 */
+	it.skipIf(!existsSync(FOUR_PLAYER) || !existsSync(ORIGINAL))(
+		'zet de extra spawns alleen op lege tegels',
+		async () => {
+			const original = await loadRaw(ORIGINAL);
+			const four = await loadRaw(FOUR_PLAYER);
+			expect(four.levels).toHaveLength(original.levels.length);
+
+			let replaced = 0;
+			for (let i = 0; i < original.levels.length; ++i) {
+				const a = original.levels[i]!;
+				const b = four.levels[i]!;
+				expect(b.tilemap.length, `level ${a.num}`).toBe(a.tilemap.length);
+
+				for (let j = 0; j < a.tilemap.length; ++j) {
+					if (a.tilemap[j] === b.tilemap[j]) continue;
+					expect(a.tilemap[j], `level ${a.num}, positie ${j}`).toBe('0');
+					expect(['Z', 'W']).toContain(b.tilemap[j]);
+					replaced++;
+				}
+			}
+			// Twee extra spawns per level, en verder niets.
+			expect(replaced).toBe(original.levels.length * 2);
+		},
+	);
 
 	it('houdt spelers binnen het speelveld', async () => {
 		const set = await loadSet();

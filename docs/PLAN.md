@@ -200,16 +200,27 @@ Twee echte problemen, geen van beide technisch:
 - **Spawnpunten.** Er is er precies één per speler per level. Oplossing: een script dat per
   level twee extra vrije tegels kiest op maximale afstand van `X` en `Y`, met handmatige
   correctie via een kleine leveleditor. Dit is een contentklus over 80 levels.
+  *(Achteraf: de handmatige correctie bleek niet nodig — zie hieronder.)*
 - **Balans.** Vier spelers met vier bommensets maken de originele levels triviaal. Vereist
   schaling van vijand-HP/aantallen, of aangepaste levels.
 
 **Zo is het gelopen.** `packages/assets/spawns.mjs` kiest per level twee extra spawns: lege
-tegels met minstens twee vrije buren, zo ver mogelijk van `X`, `Y` en van elkaar, en niet
-binnen drie tegels van een vijand. Dat lukt voor 77 van de 80 levels; in level 6, 65 en 66
-is het te vol en spelen er maximaal twee mee. Speler 3 en 4 lenen de sprites van speler 1 en
-2 met een eigen tint — nieuwe art tekenen zou betekenen dat we toevoegen aan een set die niet
-van ons is. De balansronde is er bewust nog niet: met vier spelers zijn de originele levels
-inderdaad makkelijker, en of dat erg is hangt af van hoe het speelt.
+tegels met minstens twee begaanbare buren, zo ver mogelijk van `X`, `Y` en van elkaar, en bij
+voorkeur niet naast een vijand.
+
+De eerste versie liet drie levels liggen (6, 65 en 66) en dat leek een leveldesign-probleem.
+Dat was het niet. Twee fouten in het script: munten en teleports telden als muur terwijl je
+er gewoon overheen loopt — en juist 65 en 66 liggen bezaaid met munten — en de eis "minstens
+drie tegels van een vijand" was absoluut in plaats van een voorkeur. In level 6 staan dertien
+vijanden op 195 tegels; daar haalt geen enkele plek die drie, ook `X` en `Y` niet. Met een
+drempel die net zo lang zakt tot er twee plekken overblijven halen alle 80 levels het. Er
+wordt uitsluitend op lege tegels geschreven, dus geen munt, teleport of muur raakt kwijt; dat
+is afgedwongen met een test in plaats van met goede bedoelingen.
+
+Speler 3 en 4 lenen de sprites van speler 1 en 2 met een eigen tint — nieuwe art tekenen zou
+betekenen dat we toevoegen aan een set die niet van ons is. De balansronde is er bewust nog
+niet: met vier spelers zijn de originele levels inderdaad makkelijker, en of dat erg is hangt
+af van hoe het speelt.
 
 ---
 
