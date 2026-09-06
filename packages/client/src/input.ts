@@ -14,6 +14,13 @@
 
 import { NO_INPUT, type PlayerInput } from '@boom/sim';
 
+function isTyping(target: EventTarget | null): boolean {
+	const el = target as HTMLElement | null;
+	if (!el) return false;
+	const tag = el.tagName;
+	return tag === 'INPUT' || tag === 'TEXTAREA' || el.isContentEditable === true;
+}
+
 const SCHEME_1: Record<string, keyof PlayerInput> = {
 	ArrowUp: 'up',
 	ArrowDown: 'down',
@@ -61,6 +68,9 @@ export class Input {
 		target.addEventListener('keydown', (ev) => {
 			const e = ev as KeyboardEvent;
 			if (e.repeat) return;
+			// Niet meeluisteren terwijl iemand een kamercode intypt: die bevat gewoon letters
+			// die hier een sneltoets zijn.
+			if (isTyping(e.target)) return;
 			if (e.code === 'Escape' || SCHEMES.some((m) => e.code in m)) e.preventDefault();
 			this.down.add(e.code);
 			this.pressed.add(e.code);

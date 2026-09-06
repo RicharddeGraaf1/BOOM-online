@@ -26,6 +26,25 @@ describe('computeScaling', () => {
 		expect(computeScaling(320, 240, 1).scale).toBe(1);
 	});
 
+	it('vult het venster als daarom gevraagd wordt', () => {
+		// 838x600 is precies het geval waarin de hele factor blijft steken op 1x en een kwart
+		// van het beeld ongebruikt laat.
+		expect(computeScaling(838, 600, 1).scale).toBe(1);
+
+		const filled = computeScaling(838, 600, 1, true);
+		expect(filled.scale).toBeCloseTo(600 / 480, 2);
+		expect(filled.bufferHeight).toBeLessThanOrEqual(600);
+		expect(filled.bufferWidth).toBeLessThanOrEqual(838);
+	});
+
+	it('geeft ook bij vullen een hele backingstore in pixels', () => {
+		const s = computeScaling(1337, 911, 1.5, true);
+		expect(Number.isInteger(s.bufferWidth)).toBe(true);
+		expect(Number.isInteger(s.bufferHeight)).toBe(true);
+		// Stage en canvas moeten het exact eens zijn, anders blijft er een randje over.
+		expect(s.bufferWidth).toBe(Math.round(640 * s.scale));
+	});
+
 	it('houdt de verhouding exact 4:3', () => {
 		for (const [w, h, dpr] of [
 			[1920, 1080, 1],

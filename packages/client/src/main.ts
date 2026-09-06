@@ -50,10 +50,12 @@ interface Settings {
 	mode: RenderMode;
 	sfx: number;
 	music: number;
+	/** venster vullen met een niet-hele schaalfactor */
+	fill: boolean;
 }
 
 function loadSettings(): Settings {
-	const fallback: Settings = { mode: 'crisp', sfx: 60, music: 35 };
+	const fallback: Settings = { mode: 'crisp', sfx: 60, music: 35, fill: false };
 	try {
 		const raw = localStorage.getItem(STORAGE_KEY);
 		if (!raw) return fallback;
@@ -183,12 +185,26 @@ async function boot(): Promise<void> {
 
 	// ── Beeldschaal ───────────────────────────────────────────────────
 	function resize(): void {
-		const s = computeScaling(stageEl.clientWidth, stageEl.clientHeight, window.devicePixelRatio || 1);
+		const s = computeScaling(
+			stageEl.clientWidth,
+			stageEl.clientHeight,
+			window.devicePixelRatio || 1,
+			settings.fill,
+		);
 		app.renderer.resize(s.bufferWidth, s.bufferHeight);
 		app.canvas.style.width = `${s.cssWidth}px`;
 		app.canvas.style.height = `${s.cssHeight}px`;
 		worldLayer.scale.set(s.scale);
-		hudScale.textContent = `${BASE_WIDTH}x${BASE_HEIGHT} @ ${s.scale}x · ${settings.mode === 'crisp' ? 'scherp' : 'glad'}`;
+
+		const factor = Number.isInteger(s.scale) ? `${s.scale}x` : `${s.scale.toFixed(2)}x`;
+		hudScale.textContent = `${BASE_WIDTH}x${BASE_HEIGHT} @ ${factor} · ${settings.mode === 'crisp' ? 'scherp' : 'glad'}`;
+	}
+
+	function toggleFullscreen(): void {
+		// Volledig scherm op het document en niet op het canvas: anders vallen de menu's en de
+		// statusregel buiten het schermvullende element en zie je ze niet meer.
+		if (document.fullscreenElement) void document.exitFullscreen();
+		else void document.documentElement.requestFullscreen?.().catch(() => undefined);
 	}
 	new ResizeObserver(resize).observe(stageEl);
 	resize();
@@ -321,6 +337,9 @@ async function boot(): Promise<void> {
 			case 'quit':
 				quitToMenu();
 				break;
+			case 'fullscreen':
+				toggleFullscreen();
+				break;
 			default:
 				break;
 		}
@@ -333,12 +352,17 @@ async function boot(): Promise<void> {
 		}
 		$<HTMLInputElement>('#vol-sfx').value = String(settings.sfx);
 		$<HTMLInputElement>('#vol-music').value = String(settings.music);
+		$<HTMLInputElement>('#opt-fill').checked = settings.fill;
 	}
 
 	for (const radio of document.querySelectorAll<HTMLInputElement>('input[name="mode"]')) {
 		radio.addEventListener('change', () => {
 			if (!radio.checked) return;
 			settings.mode = radio.value as RenderMode;
+			// In de gladde modus kost een niet-hele factor niets, dus die zetten we aan. Bij
+			// terugschakelen laten we de keuze staan: die was misschien bewust.
+			if (settings.mode === 'smooth') settings.fill = true;
+			$<HTMLInputElement>('#opt-fill').checked = settings.fill;
 			saveSettings(settings);
 			status('Beeldmodus omzetten…');
 			void buildRenderer(settings.mode).then(() => {
@@ -347,6 +371,12 @@ async function boot(): Promise<void> {
 			});
 		});
 	}
+
+	$<HTMLInputElement>('#opt-fill').addEventListener('change', (ev) => {
+		settings.fill = (ev.target as HTMLInputElement).checked;
+		saveSettings(settings);
+		resize();
+	});
 
 	$<HTMLInputElement>('#vol-sfx').addEventListener('input', (ev) => {
 		settings.sfx = Number((ev.target as HTMLInputElement).value);
@@ -384,6 +414,8 @@ async function boot(): Promise<void> {
 	});
 
 	function frame(ticker: { deltaMS: number }): void {
+		if (input.justPressed('KeyF')) toggleFullscreen();
+
 		if (input.justPressed('Escape') && game) {
 			paused = !paused;
 			show(paused ? 'pause' : 'none');

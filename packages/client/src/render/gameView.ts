@@ -102,6 +102,12 @@ export class GameView {
 	private readonly textures = new Map<string, Texture>();
 	private bg: TilingSprite | null = null;
 	private border: Sprite | null = null;
+	/**
+	 * Vaste muren zijn geen entities — ze staan alleen in het botsingsraster van de wereld,
+	 * want ze veranderen nooit. Ze moeten dus apart getekend worden, één keer per level.
+	 * Vergeet je dat, dan loop je tegen muren op die er niet zijn.
+	 */
+	private walls: Container | null = null;
 	private levelKey = '';
 	/** Pas tekenen als de sheets binnen zijn; tot die tijd is er niets om te tekenen. */
 	private ready = false;
@@ -122,13 +128,13 @@ export class GameView {
 		await Promise.all(sheetsNeededFor(w).map((f) => this.cache(f)));
 		this.ready = true;
 
-		if (key === this.levelKey && this.bg && this.border) {
-			this.clearEntities();
-			return;
-		}
+		this.clearEntities();
+		// De muren staan per level anders, ook als de tegelsets gelijk zijn: altijd opnieuw.
+		this.buildWalls(w);
+
+		if (key === this.levelKey && this.bg && this.border) return;
 		this.levelKey = key;
 
-		this.clearEntities();
 		this.bg?.destroy();
 		this.border?.destroy();
 
@@ -142,6 +148,39 @@ export class GameView {
 		this.border.scale.set(1 / this.sheets.textureScale);
 		this.border.zIndex = BORDER_Z;
 		this.root.addChild(this.border);
+	}
+
+	/** Legt de vaste muren neer als één laag sprites; die hoeven daarna nooit meer aangeraakt. */
+	private buildWalls(w: World): void {
+		this.walls?.destroy({ children: true });
+
+		const layer = new Container();
+		layer.zIndex = toPixiZ(zindex.WALLS);
+
+		// fixed.png is 8 tegels breed; de kolom is het tegel-id van dit level min één.
+		// src/lifish/entities/FixedWall.cpp:18-20
+		const tex = this.sheets.tile(this.get('fixed.png'), w.tileIDs.fixed - 1);
+		const stride = w.width + 2;
+
+		// Alleen het speelveld, niet de rand: die zit al in border*.png.
+		for (let ty = 1; ty <= w.height; ++ty) {
+			for (let tx = 1; tx <= w.width; ++tx) {
+				if (w.fixed[ty * stride + tx] !== 1) continue;
+				const wall = new Sprite(tex);
+				wall.scale.set(1 / this.sheets.textureScale);
+				wall.x = tx * TILE_SIZE;
+				wall.y = ty * TILE_SIZE;
+				layer.addChild(wall);
+			}
+		}
+
+		this.walls = layer;
+		this.root.addChild(layer);
+	}
+
+	/** Voor tests en diagnose: hoeveel vaste muren zijn er neergezet? */
+	get wallCount(): number {
+		return this.walls?.children.length ?? 0;
 	}
 
 	private async cache(file: string): Promise<void> {

@@ -21,10 +21,11 @@
 					<button data-action="host">Online kamer openen</button>
 					<button data-action="join">Kamer binnenlopen</button>
 					<button data-action="options">Instellingen</button>
+					<button data-action="fullscreen">Volledig scherm</button>
 				</div>
 				<p class="hint">
 					1: pijltjes + spatie &nbsp;·&nbsp; 2: WASD + shift &nbsp;·&nbsp; 3: IJKL + U
-					&nbsp;·&nbsp; 4: numpad 8456 + 0 &nbsp;·&nbsp; Esc pauzeert.<br />
+					&nbsp;·&nbsp; 4: numpad 8456 + 0 &nbsp;·&nbsp; Esc pauzeert, F is volledig scherm.<br />
 					Online spelen er tot vier mee, iedereen met de pijltjes — en je kunt onderweg
 					aanhaken bij een potje dat al loopt.
 				</p>
@@ -77,6 +78,16 @@
 				<h2>Instellingen</h2>
 				<fieldset>
 					<legend>Beeld</legend>
+					<div class="menu">
+						<button data-action="fullscreen">Volledig scherm (F)</button>
+					</div>
+					<label class="radio">
+						<input type="checkbox" id="opt-fill" />
+						<span
+							><b>Venster vullen</b> — laat de hele schaalfactor los. Groter beeld, maar
+							game-pixels worden dan ongelijk breed.</span
+						>
+					</label>
 					<label class="radio">
 						<input type="radio" name="mode" value="crisp" />
 						<span><b>Scherp</b> — de originele pixels, hele schaalfactor</span>

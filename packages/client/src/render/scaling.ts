@@ -34,24 +34,32 @@ export interface Scaling {
 /**
  * Pure functie, los te testen. `dpr` is `window.devicePixelRatio`.
  * Schaalt nooit onder 1: op een te klein scherm liever afgesneden dan wazig.
+ *
+ * `fill` laat de hele factor los en vult het venster. Dat kost precies wat hierboven staat —
+ * game-pixels worden dan ongelijk breed — maar het scheelt in de praktijk veel beeld: bij
+ * 1,25x aan beschikbare ruimte houdt de hele factor het op 1x en blijft een kwart ongebruikt.
+ * In de gladde modus valt dat nauwelijks op, want die art is al 4x opgeschaald en wordt
+ * lineair gefilterd.
  */
 export function computeScaling(
 	availCssWidth: number,
 	availCssHeight: number,
 	dpr: number,
+	fill = false,
 	baseWidth = BASE_WIDTH,
 	baseHeight = BASE_HEIGHT,
 ): Scaling {
 	const deviceWidth = Math.floor(availCssWidth * dpr);
 	const deviceHeight = Math.floor(availCssHeight * dpr);
 
-	const scale = Math.max(
-		1,
-		Math.floor(Math.min(deviceWidth / baseWidth, deviceHeight / baseHeight)),
-	);
+	const raw = Math.min(deviceWidth / baseWidth, deviceHeight / baseHeight);
+	const wanted = Math.max(1, fill ? raw : Math.floor(raw));
 
-	const bufferWidth = baseWidth * scale;
-	const bufferHeight = baseHeight * scale;
+	// De backingstore moet een heel aantal pixels zijn; de schaal leiden we daaruit terug af,
+	// zodat stage en canvas het exact eens zijn en er geen halve pixel overblijft.
+	const bufferWidth = Math.round(baseWidth * wanted);
+	const scale = bufferWidth / baseWidth;
+	const bufferHeight = Math.round(baseHeight * scale);
 
 	return {
 		scale,
