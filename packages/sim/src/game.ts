@@ -27,29 +27,84 @@ export class Game {
 	world: World;
 	phase: Phase = 'playing';
 	phaseT = 0;
-	nPlayers: number;
+
+	/**
+	 * Wie er meedoen vanaf het volgende level. Iemand die halverwege een potje binnenkomt
+	 * kijkt eerst mee en spawnt bij de levelwissel — midden in een level laten verschijnen
+	 * is oneerlijk voor wie er al staat, en vaak ook gewoon dodelijk.
+	 */
+	private readonly pendingJoins = new Set<number>();
 
 	private accumulator = 0;
 	private seed: number;
 
-	constructor(levelSet: LevelSet, nPlayers: number, startLevel = 1, seed = Date.now() | 0) {
+	/**
+	 * `players` meegeven is voor de netclient: die moet exact de spelerstand van de server
+	 * overnemen vóórdat de wereld gebouwd wordt, want daaraan hangt wie er spawnt.
+	 */
+	constructor(
+		levelSet: LevelSet,
+		nPlayers: number,
+		startLevel = 1,
+		seed = Date.now() | 0,
+		players?: PlayerState[],
+	) {
 		this.levelSet = levelSet;
-		this.nPlayers = Math.max(1, Math.min(MAX_PLAYERS, nPlayers));
 		this.seed = seed;
-		this.players = [1, 2, 3, 4].map((id) => newPlayerState(id, id <= nPlayers));
-		this.world = createWorld(levelSet, startLevel, this.players, { seed, nPlayers });
+		const count = Math.max(1, Math.min(MAX_PLAYERS, nPlayers));
+		this.players = players ?? [1, 2, 3, 4].map((id) => newPlayerState(id, id <= count));
+		this.world = createWorld(levelSet, startLevel, this.players, { seed });
+	}
+
+	/** Het aantal spelers dat nu meedoet. Afgeleid, want de bezetting kan gaten hebben. */
+	get nPlayers(): number {
+		return this.players.filter((p) => p.present).length;
+	}
+
+	/** De id's die meedoen; niet per se aaneengesloten. */
+	get playerIds(): number[] {
+		return this.players.filter((p) => p.present).map((p) => p.id);
+	}
+
+	/** Meld iemand aan. Hij doet mee vanaf het volgende level. */
+	join(playerId: number): void {
+		if (playerId < 1 || playerId > MAX_PLAYERS) return;
+		if (this.players[playerId - 1]?.present) return;
+		this.pendingJoins.add(playerId);
+	}
+
+	/** Wacht deze speler nog op de levelwissel? */
+	isPending(playerId: number): boolean {
+		return this.pendingJoins.has(playerId);
+	}
+
+	/**
+	 * Meld iemand af. Zijn poppetje verdwijnt meteen uit het veld — een stilstaand lichaam
+	 * laten staan tot een vijand er tegenaan loopt is nergens goed voor.
+	 */
+	leave(playerId: number): void {
+		this.pendingJoins.delete(playerId);
+		const ps = this.players[playerId - 1];
+		if (ps) ps.present = false;
+		this.world.entities = this.world.entities.filter(
+			(e) => !(e.kind === 'player' && e.playerId === playerId),
+		);
 	}
 
 	/** Nieuwe wereld voor hetzelfde of een volgend level, met behoud van de spelerstand. */
 	loadLevel(levelNum: number): void {
+		this.applyPendingJoins();
 		this.seed = (this.seed * 1103515245 + 12345) | 0;
-		this.world = createWorld(this.levelSet, levelNum, this.players, {
-			seed: this.seed,
-			nPlayers: this.nPlayers,
-		});
+		this.world = createWorld(this.levelSet, levelNum, this.players, { seed: this.seed });
 		this.phase = 'playing';
 		this.phaseT = 0;
 		this.accumulator = 0;
+	}
+
+	/** Een nieuwkomer begint met een schone lei: eigen levens, continues en score. */
+	private applyPendingJoins(): void {
+		for (const id of this.pendingJoins) this.players[id - 1] = newPlayerState(id, true);
+		this.pendingJoins.clear();
 	}
 
 	/**

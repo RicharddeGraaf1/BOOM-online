@@ -71,6 +71,12 @@ export class NetClient {
 		this.game = null;
 	}
 
+	/** Waar zolang je nog op de levelwissel wacht om mee te mogen doen. */
+	get waitingForNextLevel(): boolean {
+		if (!this.game || this.playerId === 0) return false;
+		return this.game.players[this.playerId - 1]?.present === false;
+	}
+
 	private setPhase(phase: NetPhase, detail?: string): void {
 		this.phase = phase;
 		this.handlers.onPhase(phase, detail);
@@ -112,12 +118,13 @@ export class NetClient {
 			case 'level': {
 				// De client bouwt zijn eigen wereld op uit hetzelfde level; de server-snapshots
 				// corrigeren hem daarna. De seed doet er niet toe: alle willekeur die telt komt
-				// via de snapshots binnen.
-				const game = new Game(this.levelSet, msg.nPlayers, msg.levelNum, 1);
-				game.players = msg.players.map(
+				// via de snapshots binnen. De spelerstand gaat wél mee de constructor in, want
+				// daaraan hangt wie er spawnt — kom je halverwege binnen, dan sta je nog niet
+				// in het veld en kijk je eerst mee.
+				const players = msg.players.map(
 					(p) => ({ ...p, letters: [...p.letters] }) as PlayerState,
 				);
-				game.world.players = game.players;
+				const game = new Game(this.levelSet, msg.nPlayers, msg.levelNum, 1, players);
 				this.game = game;
 				this.setPhase('playing');
 				this.handlers.onLevel(game);

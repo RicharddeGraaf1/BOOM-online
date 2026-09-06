@@ -15,15 +15,18 @@
 				<h1>BOOM<span>online</span></h1>
 				<div class="menu">
 					<button data-action="solo">Eén speler</button>
-					<button data-action="coop-local">Co-op op één toetsenbord</button>
+					<button data-action="coop-local" data-players="2">Co-op met 2 op één toetsenbord</button>
+					<button data-action="coop-local" data-players="3">Co-op met 3 op één toetsenbord</button>
+					<button data-action="coop-local" data-players="4">Co-op met 4 op één toetsenbord</button>
 					<button data-action="host">Online kamer openen</button>
 					<button data-action="join">Kamer binnenlopen</button>
 					<button data-action="options">Instellingen</button>
 				</div>
 				<p class="hint">
-					Speler 1: pijltjes + spatie &nbsp;·&nbsp; Speler 2: WASD + linker shift &nbsp;·&nbsp;
-					Esc pauzeert.<br />
-					Online spelen er tot vier mee; iedereen speelt dan met de pijltjes.
+					1: pijltjes + spatie &nbsp;·&nbsp; 2: WASD + shift &nbsp;·&nbsp; 3: IJKL + U
+					&nbsp;·&nbsp; 4: numpad 8456 + 0 &nbsp;·&nbsp; Esc pauzeert.<br />
+					Online spelen er tot vier mee, iedereen met de pijltjes — en je kunt onderweg
+					aanhaken bij een potje dat al loopt.
 				</p>
 			</section>
 
@@ -44,7 +47,10 @@
 			<!-- Wachtkamer -->
 			<section class="panel" id="screen-lobby" hidden>
 				<h2>Kamer <span id="lobby-code">····</span></h2>
-				<p class="hint">Deel deze code of de link. Er kunnen tot vier spelers mee.</p>
+				<p class="hint">
+					Deel deze code of de link. Er kunnen tot vier spelers mee, en wie later
+					binnenkomt kijkt eerst mee en doet mee vanaf het volgende level.
+				</p>
 				<div class="link-row">
 					<input id="lobby-link" readonly />
 					<button data-action="copy-link">Kopieer</button>
@@ -99,6 +105,8 @@
 				</div>
 			</section>
 		</div>
+
+		<div id="toast" hidden></div>
 
 		<footer id="hud">
 			<span id="hud-status">Laden…</span>

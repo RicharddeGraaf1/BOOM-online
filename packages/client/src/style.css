@@ -263,6 +263,29 @@ li .state.ready {
 	color: #4fbf5c;
 }
 
+/*
+ * Melding over het spel heen, bijvoorbeeld terwijl je meekijkt tot het volgende level.
+ * Bewust geen overlay: je moet er dwars doorheen kunnen blijven kijken.
+ */
+#toast {
+	position: fixed;
+	left: 50%;
+	bottom: 52px;
+	transform: translateX(-50%);
+	z-index: 5;
+	padding: 8px 16px;
+	background: rgb(23 20 14 / 0.92);
+	border: 1px solid var(--amber);
+	color: var(--ink);
+	pointer-events: none;
+	max-width: 90vw;
+	text-align: center;
+}
+
+#toast[hidden] {
+	display: none !important;
+}
+
 /* ── Statusregel ────────────────────────────────────────────────────── */
 
 #hud {

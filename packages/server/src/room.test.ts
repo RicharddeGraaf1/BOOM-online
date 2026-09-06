@@ -25,7 +25,7 @@ function levelSet(): ReturnType<typeof parseLevelSet> {
 				width: 5,
 				height: 3,
 				tileIDs: { bg: 1, border: 1, fixed: 1, breakable: 1 },
-				tilemap: 'X000000000000A0',
+				tilemap: 'X00000Y000000A0',
 				effects: [],
 			},
 		],
@@ -82,7 +82,7 @@ describe('Room', () => {
 		const sink: ServerMessage[] = [];
 		room.add(member(1, sink));
 
-		room.start(1);
+		room.start();
 		expect(sink.some((m) => m.t === 'level')).toBe(true);
 
 		// 20 snapshots per seconde: na een kwart seconde moeten er een paar binnen zijn.
@@ -98,11 +98,52 @@ describe('Room', () => {
 		expect(first.snap.meta.levelNum).toBe(1);
 	});
 
+	it('laat een late binnenkomer meekijken en pas bij het volgende level meedoen', async () => {
+		const room = new Room('TEST', levelSet());
+		const first: ServerMessage[] = [];
+		room.add(member(1, first));
+		room.start();
+
+		const late: ServerMessage[] = [];
+		room.add(member(2, late));
+
+		// Hij krijgt meteen het huidige level, zodat zijn client de wereld kan opbouwen.
+		const level = late.find((m) => m.t === 'level');
+		expect(level).toBeDefined();
+		if (level?.t !== 'level') throw new Error('geen level');
+
+		// Maar hij staat nog niet in het veld: dat gebeurt bij de levelwissel.
+		expect(level.players[1]?.present).toBe(false);
+		expect(room.game?.isPending(2)).toBe(true);
+
+		room.game?.loadLevel(2);
+		expect(room.game?.players[1]?.present).toBe(true);
+		expect(room.game?.playerIds).toEqual([1, 2]);
+		room.stop();
+	});
+
+	it('haalt een vertrekkende speler meteen uit het veld', () => {
+		const room = new Room('TEST', levelSet());
+		const sink: ServerMessage[] = [];
+		room.add(member(1, sink));
+		room.add(member(2, sink));
+		room.start();
+
+		expect(room.game?.playerIds).toEqual([1, 2]);
+		const before = room.game!.world.entities.filter((e) => e.kind === 'player').length;
+		expect(before).toBe(2);
+
+		room.remove(2);
+		expect(room.game?.playerIds).toEqual([1]);
+		expect(room.game!.world.entities.filter((e) => e.kind === 'player')).toHaveLength(1);
+		room.stop();
+	});
+
 	it('stopt de klok zodra de laatste speler weg is', async () => {
 		const room = new Room('TEST', levelSet());
 		const sink: ServerMessage[] = [];
 		room.add(member(1, sink));
-		room.start(1);
+		room.start();
 
 		room.remove(1);
 		expect(room.started).toBe(false);

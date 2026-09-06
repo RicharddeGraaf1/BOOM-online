@@ -33,6 +33,7 @@ const stageEl = $('#stage');
 const overlay = $('#overlay');
 const hudStatus = $('#hud-status');
 const hudScale = $('#hud-scale');
+const toastEl = $('#toast');
 
 const SCREENS: Record<Exclude<Screen, 'none'>, string> = {
 	title: '#screen-title',
@@ -175,6 +176,11 @@ async function boot(): Promise<void> {
 		hudStatus.textContent = text;
 	}
 
+	function toast(text: string | null): void {
+		toastEl.hidden = text === null;
+		if (text !== null) toastEl.textContent = text;
+	}
+
 	// ── Beeldschaal ───────────────────────────────────────────────────
 	function resize(): void {
 		const s = computeScaling(stageEl.clientWidth, stageEl.clientHeight, window.devicePixelRatio || 1);
@@ -246,10 +252,14 @@ async function boot(): Promise<void> {
 			li.append(name, state);
 			list.appendChild(li);
 		}
-		$<HTMLButtonElement>('#start-game').disabled = net.lobby.members.length === 0;
+		const n = net.lobby.members.length;
+		const start = $<HTMLButtonElement>('#start-game');
+		start.disabled = n === 0;
+		start.textContent = n === 1 ? 'Starten (alleen)' : `Starten met ${n} spelers`;
 	}
 
 	function quitToMenu(): void {
+		toast(null);
 		net?.disconnect();
 		net = null;
 		game = null;
@@ -270,7 +280,7 @@ async function boot(): Promise<void> {
 				void startLocal(1);
 				break;
 			case 'coop-local':
-				void startLocal(2);
+				void startLocal(Number(target.dataset['players'] ?? 2));
 				break;
 			case 'host':
 				startOnline('');
@@ -367,8 +377,8 @@ async function boot(): Promise<void> {
 				for (let id = 1; id <= 4; ++id)
 					inputs.push(id === net.playerId ? input.read(1) : undefined);
 			} else {
-				inputs.push(input.read(1));
-				inputs.push(game.nPlayers >= 2 ? input.read(2) : undefined);
+				for (let id = 1; id <= 4; ++id)
+					inputs.push(id <= game.nPlayers ? input.read(id as 1 | 2 | 3 | 4) : undefined);
 			}
 
 			if (mode === 'online' && net) net.sendInput(game.world.tick, input.read(1));
@@ -379,6 +389,14 @@ async function boot(): Promise<void> {
 					if (ev.t === 'sound') audio.play(ev.name);
 				}
 			}
+
+			// Wie halverwege binnenkomt kijkt mee tot de levelwissel; dat moet je wel weten,
+			// anders zit je te drukken op een poppetje dat er niet is.
+			toast(
+				mode === 'online' && net?.waitingForNextLevel
+					? 'Je kijkt mee — je doet mee vanaf het volgende level'
+					: null,
+			);
 
 			void syncLevel(game);
 			gameView.draw(settings.mode === 'crisp');
@@ -406,6 +424,19 @@ async function boot(): Promise<void> {
 		void audio.playMusic(g.track);
 		status(`Level ${g.world.levelNum}`);
 		levelLoading = false;
+	}
+
+	// Zonder gegenereerde spawnpunten kunnen speler 3 en 4 nergens staan. Dan die knoppen
+	// niet aanbieden, in plaats van ze te laten mislukken zonder uitleg.
+	const hasExtraSpawns = levelSet.levels.some((l) =>
+		l.cells.some((c) => c.kind === 'player3'),
+	);
+	if (!hasExtraSpawns) {
+		for (const btn of document.querySelectorAll<HTMLButtonElement>('[data-players]')) {
+			if (Number(btn.dataset['players']) <= 2) continue;
+			btn.disabled = true;
+			btn.title = 'Draai eerst `npm run spawns` om spawnpunten voor speler 3 en 4 te maken.';
+		}
 	}
 
 	// Direct in een kamer vallen als de link er een noemt.

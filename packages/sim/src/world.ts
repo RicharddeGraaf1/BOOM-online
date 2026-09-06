@@ -59,8 +59,6 @@ export function newPlayerState(id: number, present: boolean): PlayerState {
 
 export interface WorldOptions {
 	seed: number;
-	/** aantal spelers dat meedoet: 1 of 2 */
-	nPlayers: number;
 }
 
 export function createWorld(
@@ -104,11 +102,16 @@ export function createWorld(
 		w.fixed[gridIndex(w, w.width + 1, ty)] = 1;
 	}
 
-	loadTiles(w, level, opts.nPlayers);
+	loadTiles(w, level);
 	return w;
 }
 
-function loadTiles(w: World, level: Level, nPlayers: number): void {
+/**
+ * Wie er spawnt, hangt af van `PlayerState.present` en niet van een aantal. Dat verschil doet
+ * ertoe zodra iemand halverwege een potje meedoet of eruit stapt: dan is de bezetting niet
+ * meer "de eerste N", maar bijvoorbeeld speler 1 en 3.
+ */
+function loadTiles(w: World, level: Level): void {
 	for (let top = 0; top < level.height; ++top) {
 		for (let left = 0; left < level.width; ++left) {
 			const cell = level.cells[top * level.width + left];
@@ -132,16 +135,16 @@ function loadTiles(w: World, level: Level, nPlayers: number): void {
 					spawn(w, makeTeleport(w, tx, ty));
 					break;
 				case Tile.PLAYER1:
-					if (nPlayers >= 1) spawnPlayerAt(w, 1, x, y);
+					spawnPlayerAt(w, 1, x, y);
 					break;
 				case Tile.PLAYER2:
-					if (nPlayers >= 2) spawnPlayerAt(w, 2, x, y);
+					spawnPlayerAt(w, 2, x, y);
 					break;
 				case Tile.PLAYER3:
-					if (nPlayers >= 3) spawnPlayerAt(w, 3, x, y);
+					spawnPlayerAt(w, 3, x, y);
 					break;
 				case Tile.PLAYER4:
-					if (nPlayers >= 4) spawnPlayerAt(w, 4, x, y);
+					spawnPlayerAt(w, 4, x, y);
 					break;
 				case Tile.ENEMY:
 					spawn(w, makeEnemy(w, cell.enemyId, x, y));

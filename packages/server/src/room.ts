@@ -6,7 +6,7 @@
  * invoer — nooit posities.
  */
 
-import { MAX_PLAYERS, NO_INPUT, type LevelSet, type PlayerInput } from '@boom/sim';
+import { MAX_PLAYERS, NO_INPUT, newPlayerState, type LevelSet, type PlayerInput } from '@boom/sim';
 import { Game, SNAPSHOT_HZ, takeSnapshot, type ServerMessage } from '@boom/sim';
 
 
@@ -37,6 +37,8 @@ export class Room {
 	private timer: NodeJS.Timeout | null = null;
 	private tickCount = 0;
 	private lastTick = 0;
+	/** De wereld waarover we het laatst een `level`-bericht stuurden. */
+	private announcedWorld: unknown = null;
 
 	constructor(code: string, levelSet: LevelSet) {
 		this.code = code;
@@ -53,10 +55,19 @@ export class Room {
 		this.members.set(member.playerId, member);
 		this.emptySince = null;
 		this.broadcastLobby();
+
+		// Loopt er al een potje? Dan mag hij meekijken en doet hij mee vanaf het volgende
+		// level. Het `level`-bericht laat zijn client de wereld opbouwen, zodat de snapshots
+		// die zo binnenkomen ergens op geplakt kunnen worden.
+		if (this.started && this.game) {
+			this.game.join(member.playerId);
+			member.send(this.levelMessage());
+		}
 	}
 
 	remove(playerId: number): void {
 		this.members.delete(playerId);
+		this.game?.leave(playerId);
 		if (this.members.size === 0) {
 			this.stop();
 			this.emptySince = Date.now();
@@ -93,12 +104,18 @@ export class Room {
 		});
 	}
 
-	start(nPlayers: number): void {
-		if (this.started) return;
+	/**
+	 * Wie er meedoen bepalen we hier uit de kamer zelf, niet uit het meegestuurde aantal.
+	 * De bezetting kan namelijk gaten hebben — als speler 2 weggaat en speler 3 blijft, is
+	 * "twee spelers" niet hetzelfde als "speler 1 en 2".
+	 */
+	start(): void {
+		if (this.started || this.members.size === 0) return;
 		this.started = true;
 
 		const seed = (Math.random() * 0x7fffffff) | 0;
-		this.game = new Game(this.levelSet, Math.max(1, Math.min(MAX_PLAYERS, nPlayers)), 1, seed);
+		const players = [1, 2, 3, 4].map((id) => newPlayerState(id, this.members.has(id)));
+		this.game = new Game(this.levelSet, this.members.size, 1, seed, players);
 		this.announceLevel();
 
 		this.lastTick = Date.now();
@@ -112,15 +129,21 @@ export class Room {
 		this.game = null;
 	}
 
+	private levelMessage(): ServerMessage {
+		const game = this.game!;
+		return {
+			t: 'level',
+			levelNum: game.world.levelNum,
+			seed: 0,
+			nPlayers: game.nPlayers,
+			players: game.players.map((p) => ({ ...p, letters: [...p.letters] as never })),
+		};
+	}
+
 	private announceLevel(): void {
 		if (!this.game) return;
-		this.broadcast({
-			t: 'level',
-			levelNum: this.game.world.levelNum,
-			seed: 0,
-			nPlayers: this.game.nPlayers,
-			players: this.game.players.map((p) => ({ ...p, letters: [...p.letters] as never })),
-		});
+		this.announcedWorld = this.game.world;
+		this.broadcast(this.levelMessage());
 	}
 
 	private tick(): void {
@@ -131,14 +154,16 @@ export class Room {
 		const dt = Math.min(0.25, (now - this.lastTick) / 1000);
 		this.lastTick = now;
 
-		const before = game.world.levelNum;
 		const inputs: (PlayerInput | undefined)[] = [];
 		for (let id = 1; id <= MAX_PLAYERS; ++id) inputs.push(this.members.get(id)?.input);
 		if (!inputs[0]) inputs[0] = { ...NO_INPUT };
 
 		game.advance(dt, inputs);
 
-		if (game.world.levelNum !== before) this.announceLevel();
+		// Vergelijken op de wereld zelf en niet op het levelnummer: bij een retry blijft dat
+		// nummer gelijk terwijl er wel degelijk een nieuwe wereld staat — en juist dan is er
+		// misschien iemand bijgekomen die erin hoort.
+		if (game.world !== this.announcedWorld) this.announceLevel();
 
 		if (++this.tickCount % SNAPSHOT_EVERY === 0) {
 			this.broadcast({ t: 'snap', snap: takeSnapshot(game.world) });

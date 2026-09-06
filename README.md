@@ -32,14 +32,21 @@ Vindt het importscript je installatie niet, wijs hem dan aan met
 
 ## Spelen
 
+Lokaal spelen er één tot vier mee op hetzelfde toetsenbord:
+
 | | |
 |---|---|
 | Speler 1 | pijltjes + spatie |
-| Speler 2 (lokaal) | WASD + linker shift |
+| Speler 2 | WASD + linker shift |
+| Speler 3 | IJKL + U |
+| Speler 4 | numpad 8456 + numpad 0 |
 | Pauze | Esc |
 
 Online opent de gastheer een kamer en deelt de code van vier tekens of de link. Er kunnen tot
-vier spelers mee; iedereen speelt dan met de pijltjes.
+vier spelers mee en iedereen gebruikt dan de pijltjes. Kom je binnen terwijl er al gespeeld
+wordt, dan kijk je mee en doe je mee vanaf het volgende level — midden in een level laten
+verschijnen is oneerlijk voor wie er al staat, en vaak ook gewoon dodelijk. Wie weggaat
+verdwijnt meteen uit het veld.
 
 In **Instellingen** staat de beeldmodus:
 
@@ -57,7 +64,8 @@ Alle zes fasen uit het plan zijn af.
   teleports, levens, continues, hurry-up en de extra game met EXTRA-letters.
 - Geluid en muziek uit de originele assets, met de loop-punten uit `music/loops.txt`.
 - Online co-op: server-autoritatief, 20 snapshots per seconde, prediction op de client.
-- Vier spelers, met gegenereerde spawnpunten in alle 80 levels.
+- Eén tot vier spelers, met gegenereerde spawnpunten in alle 80 levels.
+- Onderweg aanhaken bij een lopend potje, en er weer uit stappen.
 
 ## Structuur
 

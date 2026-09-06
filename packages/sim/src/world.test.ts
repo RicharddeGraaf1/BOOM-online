@@ -12,6 +12,14 @@ import { NO_INPUT } from './types.js';
  * De sim rekent met een border van één tegel eromheen, dus tegel (1,1) is de linkerbovenhoek.
  */
 function makeWorld(rows: string[], nPlayers = 1): World {
+	return makeWorldFor(
+		rows,
+		[1, 2, 3, 4].filter((id) => id <= nPlayers),
+	);
+}
+
+/** Zelfde veld, maar met een expliciete bezetting — die hoeft niet aaneengesloten te zijn. */
+function makeWorldFor(rows: string[], presentIds: number[]): World {
 	const width = rows[0]!.length;
 	const height = rows.length;
 	const tilemap = rows
@@ -19,7 +27,9 @@ function makeWorld(rows: string[], nPlayers = 1): World {
 		.replace(/\./g, '0')
 		.replace(/#/g, '1')
 		.replace(/x/g, '2')
-		.replace(/c/g, '3');
+		.replace(/c/g, '3')
+		.replace(/z/g, 'Z')
+		.replace(/w/g, 'W');
 
 	const raw: RawLevelSet = {
 		name: 'test',
@@ -46,8 +56,8 @@ function makeWorld(rows: string[], nPlayers = 1): World {
 	};
 
 	const set = parseLevelSet(raw);
-	const players = [newPlayerState(1, true), newPlayerState(2, nPlayers >= 2)];
-	const w = createWorld(set, 1, players, { seed: 12345, nPlayers });
+	const players = [1, 2, 3, 4].map((id) => newPlayerState(id, presentIds.includes(id)));
+	const w = createWorld(set, 1, players, { seed: 12345 });
 
 	// Een level zonder vijanden is meteen uitgespeeld en dan staat update() stil. Voor tests
 	// die tijd nodig hebben zetten we de vijand op zijn plek vast in plaats van hem weg te
@@ -90,6 +100,20 @@ describe('wereldopbouw', () => {
 	it('laat speler 2 weg als er maar één speler meedoet', () => {
 		const w = makeWorld(['X.Y', '...'], 1);
 		expect(ents(w, 'player')).toHaveLength(1);
+	});
+
+	it('zet drie spelers neer als er drie meedoen', () => {
+		const w = makeWorld(['X.Y.z', '....w'], 3);
+		expect(ents(w, 'player').map((p) => p.playerId).sort()).toEqual([1, 2, 3]);
+	});
+
+	/**
+	 * Dit is het geval waar een telling het laat afweten: speler 2 stapt eruit en speler 3
+	 * blijft. "Twee spelers" is dan niet hetzelfde als "speler 1 en 2".
+	 */
+	it('spawnt op wie er meedoet, ook als de bezetting een gat heeft', () => {
+		const w = makeWorldFor(['X.Y.z', '....w'], [1, 3]);
+		expect(ents(w, 'player').map((p) => p.playerId).sort()).toEqual([1, 3]);
 	});
 });
 

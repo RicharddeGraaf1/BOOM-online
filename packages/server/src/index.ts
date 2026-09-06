@@ -171,7 +171,9 @@ async function main(): Promise<void> {
 					break;
 
 				case 'start':
-					room?.start(msg.nPlayers);
+					// De kamer bepaalt zelf wie er meedoen; het meegestuurde aantal is niet
+					// betrouwbaar (en niet nodig).
+					room?.start();
 					break;
 
 				case 'input':
