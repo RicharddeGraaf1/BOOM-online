@@ -14,6 +14,8 @@ import { CanvasSource, ImageSource, Rectangle, Texture, TextureSource } from 'pi
 import { TILE_SIZE } from '@boom/sim';
 import { UPSCALE_FACTOR, upscaleImage } from './upscale.js';
 
+export { CORE_SHEETS } from './sheetNames.js';
+
 export type RenderMode = 'crisp' | 'smooth';
 
 const GRAPHICS = 'assets/graphics';
@@ -85,7 +87,7 @@ export class Sheets {
 	}
 
 	/** Laadt alvast een reeks sheets, zodat er tijdens het spelen niets hapert. */
-	async preload(files: string[]): Promise<void> {
+	async preload(files: readonly string[]): Promise<void> {
 		await Promise.all(files.map((f) => this.sheet(f)));
 	}
 
@@ -117,28 +119,3 @@ export class Sheets {
 	}
 }
 
-/** De sheets die elk level sowieso nodig heeft. */
-export const CORE_SHEETS = [
-	'player1.png',
-	'player2.png',
-	'bomb.png',
-	'explosionC.png',
-	'explosionH.png',
-	'explosionV.png',
-	'bonuses.png',
-	'coin.png',
-	'teleport.png',
-	'fixed.png',
-	'breakable.png',
-	'flash.png',
-	'aliensprite.png',
-	'extra_letters.png',
-	'panel.png',
-	'playerheads.png',
-	'health.png',
-	'bonus_icons.png',
-	'extra_icons.png',
-	'hurryup.png',
-	'gameover.png',
-	'extragame.png',
-];

@@ -21,6 +21,7 @@ import {
 	type World,
 } from '@boom/sim';
 import { playerSheet, playerTint } from './playerColors.js';
+import { sheetsNeededFor } from './sheetNames.js';
 import type { Sheets } from './sheets.js';
 
 const BORDER_Z = 1000;
@@ -102,6 +103,8 @@ export class GameView {
 	private bg: TilingSprite | null = null;
 	private border: Sprite | null = null;
 	private levelKey = '';
+	/** Pas tekenen als de sheets binnen zijn; tot die tijd is er niets om te tekenen. */
+	private ready = false;
 
 	constructor(sheets: Sheets, world: () => World) {
 		this.sheets = sheets;
@@ -113,15 +116,11 @@ export class GameView {
 	async prepareLevel(w: World): Promise<void> {
 		const key = `${w.tileIDs.bg}/${w.tileIDs.border}/${w.tileIDs.fixed}/${w.tileIDs.breakable}`;
 
-		const needed = new Set<string>();
-		for (const e of w.entities) {
-			if (e.kind === 'enemy') needed.add(`enemy${e.enemyId}.png`);
-			if (e.kind === 'boss')
-				needed.add(e.bossKind === 'alien' ? 'alien_boss.png' : 'big_alien_boss.png');
-		}
-		needed.add(`bg${w.tileIDs.bg}.png`);
-		needed.add(`border${w.tileIDs.border}.png`);
-		await Promise.all([...needed].map((f) => this.cache(f)));
+		// Álles wat getekend kan worden moet hier binnen zijn. De Sheets-cache voorladen is
+		// niet genoeg: deze klasse heeft zijn eigen tabel, en `get()` gooit als een sheet
+		// daar ontbreekt. Dat was precies de fout die het speelveld zwart liet.
+		await Promise.all(sheetsNeededFor(w).map((f) => this.cache(f)));
+		this.ready = true;
 
 		if (key === this.levelKey && this.bg && this.border) {
 			this.clearEntities();
@@ -156,6 +155,11 @@ export class GameView {
 		return t;
 	}
 
+	/** Voor tests en diagnose: welke sheets heeft deze view daadwerkelijk binnen? */
+	get loadedSheets(): string[] {
+		return [...this.textures.keys()].sort();
+	}
+
 	private clearEntities(): void {
 		for (const v of this.views.values()) {
 			this.root.removeChild(v.root);
@@ -166,6 +170,7 @@ export class GameView {
 
 	/** Eén frame tekenen. `crisp` bepaalt of posities op hele spelpixels worden afgerond. */
 	draw(crisp: boolean): void {
+		if (!this.ready) return;
 		const w = this.world();
 		const alive = new Set<number>();
 

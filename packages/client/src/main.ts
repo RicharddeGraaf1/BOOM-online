@@ -360,7 +360,30 @@ async function boot(): Promise<void> {
 	});
 
 	// ── Spellus ───────────────────────────────────────────────────────
+	/**
+	 * Een uitzondering in deze callback breekt de hele ticker af — óók Pixi's eigen render,
+	 * want die hangt eraan als volgende luisteraar. Het gevolg is een zwart scherm zonder
+	 * enige aanwijzing. Daarom vangen we hier af en zetten we de fout in de statusregel;
+	 * één keer per boodschap, anders loopt de console vol met zestig regels per seconde.
+	 */
+	let lastError = '';
+	function reportError(err: unknown): void {
+		const message = err instanceof Error ? err.message : String(err);
+		if (message === lastError) return;
+		lastError = message;
+		console.error(err);
+		status(`Fout tijdens tekenen: ${message}`);
+	}
+
 	app.ticker.add((ticker) => {
+		try {
+			frame(ticker);
+		} catch (err) {
+			reportError(err);
+		}
+	});
+
+	function frame(ticker: { deltaMS: number }): void {
 		if (input.justPressed('Escape') && game) {
 			paused = !paused;
 			show(paused ? 'pause' : 'none');
@@ -413,17 +436,24 @@ async function boot(): Promise<void> {
 		}
 
 		input.endFrame();
-	});
+	}
 
 	let levelLoading = false;
 	async function syncLevel(g: Game): Promise<void> {
 		if (renderedWorld === g.world || levelLoading) return;
 		levelLoading = true;
-		renderedWorld = g.world;
-		await gameView.prepareLevel(g.world);
-		void audio.playMusic(g.track);
-		status(`Level ${g.world.levelNum}`);
-		levelLoading = false;
+		try {
+			renderedWorld = g.world;
+			await gameView.prepareLevel(g.world);
+			void audio.playMusic(g.track);
+			status(`Level ${g.world.levelNum}`);
+		} catch (err) {
+			// Blijft dit hangen, dan zie je niets meer; dus melden en opnieuw laten proberen.
+			renderedWorld = null;
+			reportError(err);
+		} finally {
+			levelLoading = false;
+		}
 	}
 
 	// Zonder gegenereerde spawnpunten kunnen speler 3 en 4 nergens staan. Dan die knoppen

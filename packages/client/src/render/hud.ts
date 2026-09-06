@@ -13,8 +13,16 @@ import { PLAYER_TINTS } from './playerColors.js';
 import type { Sheets } from './sheets.js';
 
 const FONT = 'BoomPanel';
-const BLOCK_TOP = 52;
-const BLOCK_HEIGHT = 106;
+/**
+ * panel.png heeft zijn eigen art: het BOOM-logo bovenaan en het Factor Software-logo
+ * onderaan. Daar mag niets overheen, dus alle tekst begint onder het logo en de blokken
+ * stoppen ruim voor de onderkant.
+ */
+const HEADER_TOP = 62;
+const BLOCK_TOP = 90;
+const BLOCK_HEIGHT = 86;
+/** Bij één of twee spelers is er ruimte zat; dan mogen de blokken uit elkaar staan. */
+const BLOCK_HEIGHT_ROOMY = 140;
 
 /** De originele bitmapfont, zodat de cijfers precies zo staan als in het spel. */
 export async function loadPanelFont(): Promise<void> {
@@ -67,9 +75,9 @@ export class Hud {
 		this.bg.scale.set(1 / this.sheets.textureScale);
 		this.root.addChild(this.bg);
 
-		this.levelText.position.set(6, 6);
-		this.timeText.position.set(6, 18);
-		this.statusText.position.set(6, 34);
+		this.levelText.position.set(6, HEADER_TOP);
+		this.timeText.position.set(50, HEADER_TOP - 2);
+		this.statusText.position.set(6, HEADER_TOP + 14);
 		this.root.addChild(this.levelText, this.timeText, this.statusText);
 
 		for (let i = 0; i < MAX_PLAYERS; ++i) {
@@ -97,7 +105,7 @@ export class Hud {
 		root.addChild(name);
 
 		const score = label(8, 0xffffff);
-		score.position.set(4, 24);
+		score.position.set(4, 23);
 		root.addChild(score);
 
 		const lives = label(8, 0xcccccc);
@@ -105,11 +113,11 @@ export class Hud {
 		root.addChild(lives);
 
 		const bombs = label(8, 0xcccccc);
-		bombs.position.set(4, 46);
+		bombs.position.set(48, 35);
 		root.addChild(bombs);
 
 		const health = new Graphics();
-		health.position.set(4, 60);
+		health.position.set(4, 48);
 		root.addChild(health);
 
 		// De vijf permanente bonussen als iconen van 15x15 uit bonus_icons.png.
@@ -117,7 +125,7 @@ export class Hud {
 		for (let i = 0; i < BONUS.N_PERMANENT_BONUS_TYPES; ++i) {
 			const s = new Sprite(this.sheets.frame(icons, i * 15, 0, 15, 15));
 			s.scale.set(1 / this.sheets.textureScale);
-			s.position.set(4 + i * 17, 72);
+			s.position.set(4 + i * 17, 60);
 			s.alpha = 0.2;
 			root.addChild(s);
 			iconSprites.push(s);
@@ -127,7 +135,7 @@ export class Hud {
 	}
 
 	update(w: World, bombsLeft: (playerId: number) => number): void {
-		this.levelText.text = `LEVEL ${w.levelNum}`;
+		this.levelText.text = `LV ${w.levelNum}`;
 
 		const t = Math.max(0, Math.ceil(w.timeLeft));
 		this.timeText.text = `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
@@ -139,9 +147,9 @@ export class Hud {
 				? 'HURRY UP!'
 				: '';
 
-		// Bij twee spelers krijgen de blokken alle ruimte; bij drie of vier schuiven ze op.
+		// Bij één of twee spelers krijgen de blokken alle ruimte; bij drie of vier schuiven ze op.
 		const present = w.players.filter((p) => p.present).length;
-		const spacing = present <= 2 ? BLOCK_HEIGHT + 60 : BLOCK_HEIGHT;
+		const spacing = present <= 2 ? BLOCK_HEIGHT_ROOMY : BLOCK_HEIGHT;
 
 		let slot = 0;
 		for (let i = 0; i < this.blocks.length; ++i) {
@@ -157,8 +165,8 @@ export class Hud {
 			slot++;
 
 			block.score.text = String(ps.score).padStart(7, '0');
-			block.lives.text = `LIVES ${ps.remainingLives}`;
-			block.bombs.text = `BOMB ${bombsLeft(ps.id)}/${ps.powers.maxBombs}`;
+			block.lives.text = `x${ps.remainingLives}`;
+			block.bombs.text = `${bombsLeft(ps.id)}/${ps.powers.maxBombs}`;
 
 			const frac = Math.max(0, Math.min(1, ps.life / PLAYER.MAX_LIFE));
 			block.health
