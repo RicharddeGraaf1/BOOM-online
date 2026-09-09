@@ -9,7 +9,7 @@
  */
 
 import { DT, MAX_PLAYERS } from './constants.js';
-import { createWorld, newPlayerState, update } from './world.js';
+import { LEVEL_CLEAR_GRACE, createWorld, newPlayerState, update } from './world.js';
 import { NO_INPUT, type GameEvent, type PlayerInput, type PlayerState, type World } from './types.js';
 import type { LevelSet } from './levelset.js';
 
@@ -185,8 +185,11 @@ export class Game {
 
 		switch (this.world.status) {
 			case 'cleared':
-				this.phase = 'interlevel';
-				this.phaseT = 0;
+				// Nog even doorspelen: het laatste vijandje kan een letter hebben laten vallen.
+				if (this.world.clearedT >= LEVEL_CLEAR_GRACE) {
+					this.phase = 'interlevel';
+					this.phaseT = 0;
+				}
 				break;
 			case 'retry':
 				this.phase = 'interlevel';

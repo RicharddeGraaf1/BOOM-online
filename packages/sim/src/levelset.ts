@@ -20,6 +20,10 @@ export interface RawEnemyAttack {
 	id?: number;
 	fireRate: number;
 	blockTime?: number;
+	/**
+	 * Schade bij aanraking. Ontbreekt het veld, dan geldt de standaard uit Attack.hpp: 1.
+	 * (De lader van lifish maakt er 0 van; zie de toelichting bij checkBodyContact.)
+	 */
 	contactDamage?: number;
 	tileRange?: number;
 }

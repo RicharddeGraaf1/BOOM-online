@@ -88,6 +88,7 @@ export function createWorld(
 		enemyDefs: levelSet.enemies,
 		status: 'playing',
 		hadCoins: false,
+		clearedT: 0,
 		events: [],
 	};
 
@@ -189,11 +190,20 @@ export function findPlayerEntity(w: World, playerId: number): Entity | undefined
 }
 
 /** Eén simulatiestap. `inputs` is geïndexeerd op speler-id (1-based → index 0 en 1). */
+/**
+ * Hoe lang je na het laatste vijandje nog rond mag lopen. Het origineel wacht vier seconden
+ * voordat het naar het tussenscherm gaat (WinLoseHandler::_handleWin) — juist genoeg om de
+ * letter op te rapen die dat laatste vijandje liet vallen.
+ */
+export const LEVEL_CLEAR_GRACE = 4;
+
 export function update(w: World, inputs: (PlayerInput | undefined)[], dt = DT): void {
 	w.events.length = 0;
-	if (w.status !== 'playing') return;
+	// Bij 'cleared' loopt de wereld gewoon door: je kunt nog lopen en oprapen.
+	if (w.status === 'retry' || w.status === 'gameover') return;
 
 	w.tick++;
+	if (w.status === 'cleared') w.clearedT += dt;
 
 	// Animatieklok op één plek. Stond dit per systeem, dan animeerden munten en teleports
 	// niet omdat ze in geen enkel systeem langskwamen — precies wat er gebeurd was.
@@ -209,7 +219,7 @@ export function update(w: World, inputs: (PlayerInput | undefined)[], dt = DT): 
 	updateExplosions(w, dt);
 	clearWarpFlags(w);
 	cleanup(w);
-	checkConditions(w);
+	if (w.status === 'playing') checkConditions(w);
 }
 
 function updateClock(w: World, dt: number): void {

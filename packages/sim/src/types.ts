@@ -194,6 +194,8 @@ export interface World {
 	extraGameT: number;
 	/** Had dit level überhaupt munten? Zo niet, dan is er geen extra game te verdienen. */
 	hadCoins: boolean;
+	/** Seconden sinds het laatste vijandje viel; zolang die loopt speel je gewoon door. */
+	clearedT: number;
 
 	players: PlayerState[];
 	enemyDefs: RawEnemy[];

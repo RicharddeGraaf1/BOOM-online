@@ -111,8 +111,10 @@ export function updateEnemies(w: World, dt: number): void {
 		const ownIdx = inBounds(w, own.tx, own.ty) ? own.ty * (w.width + 2) + own.tx : -1;
 		if (ownIdx >= 0) blockers[ownIdx] = 0;
 
-		// Contactschade: een vijand die een speler raakt doet meteen pijn.
-		if (hasType(attack, 'contact')) checkContactDamage(w, e, attack);
+		// Elke aanraking met een vijandslichaam doet pijn, niet alleen die van vijanden met
+		// een contact-aanval. Dat laatste had ik ervan gemaakt, en daardoor kon je overal
+		// dwars doorheen lopen. src/lifish/entities/Player.cpp:180-193.
+		checkBodyContact(w, e, attack);
 
 		steer(w, e, def?.ai ?? 0, blockers, attack);
 
@@ -252,20 +254,35 @@ function steer(
 	}
 }
 
-function checkContactDamage(w: World, e: Entity, attack: RawEnemyAttack | undefined): void {
-	if (e.morphed || (e.rechargeT ?? 0) > 0) return;
+/**
+ * Schade bij het aanraken van een vijandslichaam.
+ *
+ * Let op de standaardwaarde: `Attack::contactDamage` is 1 in Attack.hpp, maar de lader in
+ * LevelSet.cpp:117 overschrijft hem met 0 zodra het veld in levels.json ontbreekt. Daardoor
+ * doet in lifish een soldaat waar je tegenaan loopt niets, wat overduidelijk niet de
+ * bedoeling is. Wij houden de standaard van de struct aan: aanraken doet minstens 1.
+ *
+ * Een gemorfde vijand doet altijd 1, ongeacht zijn gewone aanval.
+ */
+function checkBodyContact(w: World, e: Entity, attack: RawEnemyAttack | undefined): void {
+	const damage = e.morphed ? 1 : (attack?.contactDamage ?? 1);
+	if (damage <= 0) return;
+
 	for (const p of w.entities) {
 		if (p.kind !== 'player' || p.dead || p.shieldT > 0) continue;
 		if (manhattan(p.x, p.y, e.x, e.y) > 20) continue;
 
-		hurtPlayer(w, p, attack?.contactDamage ?? 1);
-		e.rechargeT = 1 / (attack?.fireRate ?? 1);
-		sound(w, `enemy${e.enemyId ?? 1}_attack.ogg`);
+		hurtPlayer(w, p, damage);
 
-		// Onthoud waar de speler stond; ai_random_forward_haunt jaagt daarop.
-		const t = entityTile(p);
-		e.attackTileX = t.tx;
-		e.attackTileY = t.ty;
+		// Een echte contact-aanval doet daarnaast zijn eigen ding: geluid, oplaadtijd, en
+		// onthouden waar de speler stond zodat ai_random_forward_haunt erop kan jagen.
+		if (!e.morphed && hasType(attack, 'contact') && (e.rechargeT ?? 0) <= 0) {
+			e.rechargeT = 1 / (attack?.fireRate ?? 1);
+			sound(w, `enemy${e.enemyId ?? 1}_attack.ogg`);
+			const t = entityTile(p);
+			e.attackTileX = t.tx;
+			e.attackTileY = t.ty;
+		}
 		return;
 	}
 }

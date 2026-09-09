@@ -3,6 +3,7 @@ import { Game } from './game.js';
 import { killEnemy } from './combat.js';
 import { parseLevelSet, type LevelSet, type RawLevelSet } from './levelset.js';
 import { EXTRA_GAME_DURATION } from './constants.js';
+import { LEVEL_CLEAR_GRACE } from './world.js';
 import { NO_INPUT, type Entity, type PlayerInput } from './types.js';
 
 /**
@@ -66,6 +67,86 @@ function coinsLeft(game: Game): number {
 function run(game: Game, ticks: number, input: PlayerInput = NO_INPUT): void {
 	for (let i = 0; i < ticks; ++i) game.advance(1 / 60, [input]);
 }
+
+describe('level uitspelen', () => {
+	/**
+	 * Het laatste vijandje kan net een letter hebben laten vallen. Ging de wereld meteen op
+	 * slot, dan kon je die niet meer oprapen. Het origineel wacht vier seconden voordat het
+	 * naar het tussenscherm gaat (WinLoseHandler::_handleWin).
+	 */
+	it('laat je na het laatste vijandje nog rondlopen', () => {
+		const game = newGame();
+		const enemy = game.world.entities.find((e) => e.kind === 'enemy') as Entity;
+		killEnemy(game.world, enemy, 1);
+		run(game, 1);
+
+		expect(game.world.status).toBe('cleared');
+		expect(game.phase).toBe('playing');
+
+		const player = game.world.entities.find((e) => e.kind === 'player')!;
+		const before = player.x;
+		run(game, 30, press({ right: true }));
+		expect(player.x).toBeGreaterThan(before);
+	});
+
+	it('gaat na vier seconden alsnog naar het tussenscherm', () => {
+		const game = newGame();
+		const enemy = game.world.entities.find((e) => e.kind === 'enemy') as Entity;
+		killEnemy(game.world, enemy, 1);
+
+		run(game, Math.ceil(LEVEL_CLEAR_GRACE * 60) + 5);
+		expect(game.phase).toBe('interlevel');
+	});
+
+	it('laat je in die tijd nog een gevallen letter oprapen', () => {
+		const game = newGame();
+		run(game, 120, press({ right: true })); // munten weg, extra game aan
+
+		const player = game.world.entities.find((e) => e.kind === 'player')!;
+		const enemy = game.world.entities.find((e) => e.kind === 'enemy') as Entity;
+		enemy.x = player.x;
+		enemy.y = player.y;
+		killEnemy(game.world, enemy, 1);
+
+		expect(game.world.entities.some((e) => e.kind === 'letter')).toBe(true);
+		run(game, 4);
+		expect(game.players[0]!.letters.filter(Boolean)).toHaveLength(1);
+	});
+});
+
+describe('aanraking met een vijand', () => {
+	/**
+	 * Elke aanraking met een vijandslichaam doet pijn, niet alleen die van vijanden met een
+	 * contact-aanval. Dat had ik verkeerd, en daardoor kon je overal dwars doorheen lopen.
+	 */
+	it('doet schade, ook bij een vijand zonder contact-aanval', () => {
+		const game = newGame();
+		const player = game.world.entities.find((e) => e.kind === 'player')!;
+		const enemy = game.world.entities.find((e) => e.kind === 'enemy') as Entity;
+
+		player.shieldT = 0;
+		const before = player.hp;
+		enemy.x = player.x;
+		enemy.y = player.y;
+
+		run(game, 2);
+		expect(player.hp).toBeLessThan(before);
+	});
+
+	it('doet geen schade zolang je een schild hebt', () => {
+		const game = newGame();
+		const player = game.world.entities.find((e) => e.kind === 'player')!;
+		const enemy = game.world.entities.find((e) => e.kind === 'enemy') as Entity;
+
+		player.shieldT = 5;
+		const before = player.hp;
+		enemy.x = player.x;
+		enemy.y = player.y;
+
+		run(game, 2);
+		expect(player.hp).toBe(before);
+	});
+});
 
 describe('extra game', () => {
 	it('begint niet zolang er nog munten liggen', () => {

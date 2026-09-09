@@ -26,6 +26,11 @@ import type { Sheets } from './sheets.js';
 
 const BORDER_Z = 1000;
 
+/** src/lifish/entities/Coin.cpp:62 */
+const COIN_FRAME_TIME = 0.02;
+/** Kleur van de schildrand om een speler. */
+const SHIELD_COLOUR = 0xffcc00;
+
 /** De z-conventie van het origineel is omgekeerd: z >= 0 onder de border, z < 0 erboven. */
 function toPixiZ(lifishZ: number): number {
 	return lifishZ >= 0 ? lifishZ : BORDER_Z - lifishZ;
@@ -69,6 +74,30 @@ function playerRow(dir: Direction): number {
 }
 
 /**
+ * aliensprite.png is 9 kolommen bij 2 rijen. De indeling is anders dan bij de gewone
+ * vijanden en loopt over de rijgrens heen. src/lifish/components/AlienSprite.cpp:24-49.
+ */
+function alienCell(dir: Direction, frame: number): { col: number; row: number } {
+	switch (dir) {
+		case Dir.UP:
+			return { col: 4 + frame, row: 0 };
+		case Dir.RIGHT:
+			// kolom 8 op rij 0, daarna 0..2 op rij 1
+			return frame === 0 ? { col: 8, row: 0 } : { col: frame - 1, row: 1 };
+		case Dir.LEFT:
+			return { col: 3 + frame, row: 1 };
+		default:
+			return { col: frame, row: 0 };
+	}
+}
+
+/** De twee sterfframes van de alien: kolom 7 en 8 op rij 1. */
+const ALIEN_DEATH: readonly { col: number; row: number }[] = [
+	{ col: 7, row: 1 },
+	{ col: 8, row: 1 },
+];
+
+/**
  * Kolom en rij in de vijandsheet. Anders opgebouwd dan de speler: down en up delen rij 0,
  * right en left rij 1, elk met vier frames. src/lifish/entities/Enemy.cpp:120-141
  */
@@ -90,8 +119,18 @@ interface View {
 	/** hoofdsprite; explosies hebben er meer, die staan in `extra` */
 	main: Sprite;
 	extra?: { h: TilingSprite; v: TilingSprite };
+	/** vier kopieën met één pixel verschuiving; samen vormen ze de schildrand */
+	outline?: Sprite[];
 	kind: string;
 }
+
+/** Verschuivingen voor de omtrek: links, rechts, boven, onder. */
+const OUTLINE_OFFSETS: readonly (readonly [number, number])[] = [
+	[-1, 0],
+	[1, 0],
+	[0, -1],
+	[0, 1],
+];
 
 export class GameView {
 	readonly root = new Container();
@@ -241,6 +280,7 @@ export class GameView {
 		root.addChild(main);
 
 		let extra: View['extra'];
+		let outline: Sprite[] | undefined;
 
 		switch (e.kind) {
 			case 'explosion': {
@@ -268,9 +308,23 @@ export class GameView {
 			case 'bomb':
 				root.zIndex = toPixiZ(zindex.BOMBS);
 				break;
-			case 'player':
+			case 'player': {
 				root.zIndex = toPixiZ(zindex.PLAYERS);
+				// De schildrand: vier gekleurde kopieën één pixel opzij, achter de sprite.
+				// Het origineel doet dit met een shader (PlayerDrawProxy); dit is hetzelfde
+				// effect met de middelen die we hier hebben.
+				outline = OUTLINE_OFFSETS.map(([ox, oy]) => {
+					const s = new Sprite();
+					s.scale.set(1 / this.sheets.textureScale);
+					s.x = ox;
+					s.y = oy;
+					s.tint = SHIELD_COLOUR;
+					s.visible = false;
+					root.addChildAt(s, 0);
+					return s;
+				});
 				break;
+			}
 			case 'enemy':
 				root.zIndex = toPixiZ(zindex.ENEMIES);
 				break;
@@ -284,8 +338,11 @@ export class GameView {
 				return null;
 		}
 
-		// `extra` alleen meegeven als het er is: exactOptionalPropertyTypes staat aan.
-		return extra ? { root, main, extra, kind: e.kind } : { root, main, kind: e.kind };
+		// Optionele velden alleen meegeven als ze er zijn: exactOptionalPropertyTypes staat aan.
+		const view: View = { root, main, kind: e.kind };
+		if (extra) view.extra = extra;
+		if (outline) view.outline = outline;
+		return view;
 	}
 
 	private updateView(view: View, e: Entity, w: World, crisp: boolean): void {
@@ -293,6 +350,7 @@ export class GameView {
 		view.root.y = crisp ? Math.round(e.y) : e.y;
 		view.root.alpha = 1;
 		view.main.visible = true;
+		view.main.tint = 0xffffff;
 
 		switch (e.kind) {
 			case 'player':
@@ -311,7 +369,10 @@ export class GameView {
 				this.drawBreakable(view, e, w);
 				break;
 			case 'coin':
-				view.main.texture = this.animTile('coin.png', e.animT, 10, 0.08);
+				// 0,02 s per frame — src/lifish/entities/Coin.cpp:62. Vier keer sneller dan wat
+				// ik ervan gemaakt had; op deze snelheid leest het als glinstering in plaats
+				// van als een ronddraaiend ding dat je aandacht opeist.
+				view.main.texture = this.animTile('coin.png', e.animT, 10, COIN_FRAME_TIME);
 				break;
 			case 'teleport':
 				view.main.texture = this.animTile('teleport.png', e.animT, 8, 0.07);
@@ -354,16 +415,30 @@ export class GameView {
 		const frame = e.moving ? Math.floor(e.animT / 0.07) % 8 : 0;
 		view.main.texture = this.sheets.tile(sheet, frame, row);
 
-		// Schild: knipperen in de laatste seconden, net als in het origineel.
-		if (e.shieldT > 0) {
-			const blink = e.shieldT > 3 || Math.floor(e.shieldT * 8) % 2 === 0;
-			view.root.alpha = blink ? 0.6 : 1;
+		// Schild: een gele rand om het poppetje, die in de laatste drie seconden knippert.
+		// src/lifish/entities/Player.cpp:410-417.
+		const diff = e.shieldT - Math.floor(e.shieldT);
+		const shown = e.shieldT > 0 && (e.shieldT > 3 || 4 * diff - Math.floor(4 * diff) < 0.5);
+		for (const s of view.outline ?? []) {
+			s.visible = shown;
+			if (shown) s.texture = view.main.texture;
 		}
 	}
 
 	private drawEnemy(view: View, e: Entity): void {
-		if (e.morphed && !e.dead) {
-			view.main.texture = this.animTile('aliensprite.png', e.animT, 4, 0.12);
+		// Een gemorfde vijand blijft een alien, ook terwijl hij doodgaat. Viel dit door naar
+		// de gewone tak, dan stierf het wolkje als het beestje dat het ooit was.
+		if (e.morphed) {
+			const alien = this.get('aliensprite.png');
+			if (e.dead) {
+				const f = ALIEN_DEATH[Math.min(ALIEN_DEATH.length - 1, Math.floor(e.deadT / 0.2))]!;
+				view.main.texture = this.sheets.tile(alien, f.col, f.row);
+				view.root.alpha = Math.max(0, 1 - e.deadT / 2);
+			} else {
+				const frame = e.moving ? Math.floor(e.animT / 0.12) % 4 : 0;
+				const { col, row } = alienCell(e.moving ? e.dir : e.facing, frame);
+				view.main.texture = this.sheets.tile(alien, col, row);
+			}
 			return;
 		}
 
@@ -388,7 +463,9 @@ export class GameView {
 		const { col, row } = enemyCell(e.moving ? e.dir : e.facing, frame);
 		view.main.texture = this.sheets.tile(sheet, col, row);
 
-		if (e.shieldT > 0) view.root.alpha = Math.floor(e.shieldT * 8) % 2 === 0 ? 0.5 : 1;
+		// Een vijand die net geraakt is knippert magenta. src/lifish/entities/Enemy.cpp:280-289.
+		view.main.tint =
+			e.shieldT > 0 && Math.floor(e.shieldT * 8) % 2 === 0 ? 0xc800c8 : 0xffffff;
 	}
 
 	private drawBomb(view: View, e: Entity): void {
