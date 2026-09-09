@@ -10,7 +10,7 @@
 
 import { DT, MAX_PLAYERS } from './constants.js';
 import { createWorld, newPlayerState, update } from './world.js';
-import { NO_INPUT, type PlayerInput, type PlayerState, type World } from './types.js';
+import { NO_INPUT, type GameEvent, type PlayerInput, type PlayerState, type World } from './types.js';
 import type { LevelSet } from './levelset.js';
 
 /** Hoe lang het scherm tussen twee levels blijft staan. */
@@ -68,6 +68,13 @@ export class Game {
 	 * is oneerlijk voor wie er al staat, en vaak ook gewoon dodelijk.
 	 */
 	private readonly pendingJoins = new Set<number>();
+
+	/**
+	 * Alles wat er deze frame gebeurd is. De wereld leegt zijn eigen lijst elke tick, en
+	 * advance() kan er meer dan één doen — dan zou de aanroeper alleen de laatste tick zien
+	 * en geluiden en punten stilletjes verliezen.
+	 */
+	readonly frameEvents: GameEvent[] = [];
 
 	private accumulator = 0;
 	private seed: number;
@@ -154,11 +161,13 @@ export class Game {
 	 */
 	advance(realDt: number, inputs: (PlayerInput | undefined)[]): number {
 		this.accumulator += Math.min(realDt, MAX_CATCHUP);
+		this.frameEvents.length = 0;
 
 		let steps = 0;
 		while (this.accumulator >= DT) {
 			this.accumulator -= DT;
 			this.step(inputs);
+			for (const ev of this.world.events) this.frameEvents.push(ev);
 			steps++;
 		}
 		return steps;

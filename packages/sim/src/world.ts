@@ -87,6 +87,7 @@ export function createWorld(
 		players,
 		enemyDefs: levelSet.enemies,
 		status: 'playing',
+		hadCoins: false,
 		events: [],
 	};
 
@@ -101,6 +102,15 @@ export function createWorld(
 	}
 
 	loadTiles(w, level);
+
+	// Zeven levels (10, 20, 30 ... 70) hebben helemaal geen munten. Zonder deze vlag is
+	// "alle munten weg" daar vanaf de eerste tick waar en brandt de extra game op voordat
+	// de speler een toets heeft aangeraakt. Het origineel kent dat probleem ook
+	// (LevelManager::_shouldTriggerExtraGame kijkt alleen of er munten liggen); dit is een
+	// bewuste afwijking, want een bonusronde die begint voordat het level begint is niet
+	// wat er bedoeld kan zijn.
+	w.hadCoins = w.entities.some((e) => e.kind === 'coin');
+
 	return w;
 }
 
@@ -185,6 +195,10 @@ export function update(w: World, inputs: (PlayerInput | undefined)[], dt = DT): 
 
 	w.tick++;
 
+	// Animatieklok op één plek. Stond dit per systeem, dan animeerden munten en teleports
+	// niet omdat ze in geen enkel systeem langskwamen — precies wat er gebeurd was.
+	for (const e of w.entities) e.animT += dt;
+
 	updateClock(w, dt);
 	updateSpeedy(w, dt);
 	updatePlayers(w, inputs, dt);
@@ -214,7 +228,7 @@ function updateClock(w: World, dt: number): void {
 	if (w.extraGame) {
 		w.extraGameT -= dt;
 		if (w.extraGameT <= 0) endExtraGame(w);
-	} else if (!w.extraGameTriggered && noCoinsLeft(w)) {
+	} else if (!w.extraGameTriggered && w.hadCoins && noCoinsLeft(w)) {
 		triggerExtraGame(w);
 	}
 }

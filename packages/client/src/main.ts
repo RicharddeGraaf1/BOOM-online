@@ -20,6 +20,7 @@ import {
 import { BASE_HEIGHT, BASE_WIDTH, computeScaling } from './render/scaling.js';
 import { CORE_SHEETS, Sheets, type RenderMode } from './render/sheets.js';
 import { GameView } from './render/gameView.js';
+import { Effects } from './render/effects.js';
 import { Hud, loadPanelFont } from './render/hud.js';
 import { Audio } from './audio.js';
 import { Input } from './input.js';
@@ -141,6 +142,7 @@ async function boot(): Promise<void> {
 	// ── Renderonderdelen die bij een modewissel opnieuw gebouwd worden ──
 	let sheets: Sheets;
 	let gameView: GameView;
+	let effects: Effects;
 	let hud: Hud;
 	let hudLayer: Container;
 	let renderedWorld: World | null = null;
@@ -162,6 +164,10 @@ async function boot(): Promise<void> {
 
 		gameView = new GameView(sheets, () => game!.world);
 		gameView.root.x = GAME_ORIGIN_X;
+
+		effects = new Effects(sheets);
+		await effects.prepare();
+		gameView.root.addChild(effects.root);
 
 		worldLayer.addChild(hudLayer, gameView.root);
 		renderedWorld = null;
@@ -446,12 +452,15 @@ async function boot(): Promise<void> {
 
 			if (mode === 'online' && net) net.sendInput(game.world.tick, input.read(1));
 
-			const steps = game.advance(dt, inputs);
-			if (steps > 0) {
-				for (const ev of game.world.events) {
-					if (ev.t === 'sound') audio.play(ev.name);
-				}
+			game.advance(dt, inputs);
+
+			// frameEvents en niet world.events: advance() kan meerdere ticks doen en de
+			// wereld leegt zijn lijst elke tick, dus anders mis je alles behalve de laatste.
+			for (const ev of game.frameEvents) {
+				if (ev.t === 'sound') audio.play(ev.name);
 			}
+			effects.handle(game.frameEvents);
+			effects.update(dt);
 
 			// Wie halverwege binnenkomt kijkt mee tot de levelwissel; dat moet je wel weten,
 			// anders zit je te drukken op een poppetje dat er niet is.
@@ -484,6 +493,7 @@ async function boot(): Promise<void> {
 		levelLoading = true;
 		try {
 			renderedWorld = g.world;
+			effects.clear();
 			await gameView.prepareLevel(g.world);
 			void audio.playMusic(g.track);
 			status(`Level ${g.world.levelNum}`);

@@ -49,12 +49,8 @@ export function trySetDirection(e: Entity, dir: Direction): boolean {
 		e.distTravelled = 0;
 		return true;
 	}
-	// Sta je stil, dan mag de bocht altijd. Anders zit je klem: de eis is uitgelijnd zijn,
-	// maar uitgelijnd raak je alleen door te bewegen — en bewegen kan alleen langs de as
-	// waar je al op zat. Je wordt dan naar de dichtstbijzijnde rasterlijn getrokken, hooguit
-	// een halve tegel.
 	const perpendicularAligned = isVertical(dir) ? isAlignedX(e) : isAlignedY(e);
-	if (!perpendicularAligned && e.moving && e.dir !== Dir.NONE) return false;
+	if (!perpendicularAligned && e.dir !== Dir.NONE) return false;
 
 	alignAxis(e, isVertical(dir));
 	e.dir = dir;

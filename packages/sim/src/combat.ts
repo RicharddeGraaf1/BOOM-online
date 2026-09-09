@@ -26,7 +26,6 @@ const IGNITED_FUSE = 0.05;
 export function updateCombat(w: World, dt: number): void {
 	for (const e of w.entities) {
 		if (e.kind !== 'bomb' || e.dead) continue;
-		e.animT += dt;
 		e.fuseT = (e.fuseT ?? 0) + dt;
 		if (e.fuseT >= (e.fuseTime ?? BOMB.DEFAULT_FUSE)) detonate(w, e);
 	}
@@ -37,10 +36,6 @@ export function updateCombat(w: World, dt: number): void {
 		if (e.t >= BONUS.EXPIRE_TIME) e.dead = true;
 	}
 
-	for (const e of w.entities) {
-		if (e.kind !== 'letter' || e.dead) continue;
-		e.animT += dt;
-	}
 }
 
 function detonate(w: World, bombEnt: Entity): void {

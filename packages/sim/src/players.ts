@@ -2,7 +2,7 @@
  * Spelers: invoer, bommen leggen, oprapen, teleporteren.
  */
 
-import { player as PLAYER } from './constants.js';
+import { TILE_SIZE, player as PLAYER } from './constants.js';
 import { Dir, type Direction } from './direction.js';
 import { entityTile, manhattan } from './grid.js';
 import { moveEntity, trySetDirection } from './movement.js';
@@ -25,14 +25,50 @@ function inputDirection(input: PlayerInput): Direction {
 	return Dir.NONE;
 }
 
+/**
+ * Stuurt de speler, met een gebufferde bocht.
+ *
+ * Een bocht kan alleen op een rasterlijn. Vraag je er een aan terwijl je daar net tussenin
+ * zit, dan onthouden we hem en schuif je door tot de eerstvolgende rand — daar wordt hij
+ * alsnog gepakt. Dat is het verschil tussen "het spel negeert mijn toets" en "het spel
+ * wacht keurig even".
+ *
+ * Wat het uitdrukkelijk NIET doet is de speler naar de dichtstbijzijnde rasterlijn trekken.
+ * Dat werkt ook, maar dan verspringt je poppetje tot een halve tegel en dat ziet eruit als
+ * een hapering.
+ */
+function steerPlayer(e: Entity, input: PlayerInput): void {
+	const want = inputDirection(input);
+
+	if (want === Dir.NONE) {
+		e.moving = false;
+		e.queuedDir = Dir.NONE;
+		return;
+	}
+
+	e.moving = true;
+
+	if (want === e.dir) {
+		e.queuedDir = Dir.NONE;
+		return;
+	}
+
+	if (trySetDirection(e, want)) e.queuedDir = Dir.NONE;
+	else e.queuedDir = want;
+}
+
 export function updatePlayers(w: World, inputs: (PlayerInput | undefined)[], dt: number): void {
 	for (const e of w.entities) {
 		if (e.kind !== 'player') continue;
 
-		e.animT += dt;
 		if (e.shieldT > 0) e.shieldT = Math.max(0, e.shieldT - dt);
 
 		if (e.dead) continue;
+
+		// Eerst kijken of een eerder geweigerde bocht nu wél kan.
+		if (e.queuedDir !== undefined && e.queuedDir !== Dir.NONE) {
+			if (trySetDirection(e, e.queuedDir)) e.queuedDir = Dir.NONE;
+		}
 
 		const ps = w.players[(e.playerId ?? 1) - 1];
 		const input = inputs[(e.playerId ?? 1) - 1];
@@ -43,20 +79,11 @@ export function updatePlayers(w: World, inputs: (PlayerInput | undefined)[], dt:
 		e.dash = speedy ? 2 : 0;
 
 		if (input) {
-			const want = inputDirection(input);
-			if (want === Dir.NONE) {
-				e.moving = false;
-			} else {
-				if (!trySetDirection(e, want)) {
-					// Richtingwissel geweigerd omdat we niet uitgelijnd staan: gewoon doorlopen.
-					e.moving = true;
-				} else {
-					e.moving = true;
-				}
-			}
+			steerPlayer(e, input);
 			if (input.bomb && ps) tryDeployBomb(w, e, ps.powers);
 		} else {
 			e.moving = false;
+			e.queuedDir = Dir.NONE;
 		}
 
 		moveEntity(w, e, dt);
@@ -72,7 +99,10 @@ function tryDeployBomb(
 	player: Entity,
 	powers: { maxBombs: number; bombRadius: number; bombFuseTime: number },
 ): void {
+	// Je moet ongeveer op een tegel staan. Zonder dit kun je een bom leggen terwijl je er
+	// half naast staat, en dan verschijnt hij achter je. LevelManager::canDeployBomb:173-175.
 	const { tx, ty } = entityTile(player);
+	if (manhattan(player.x, player.y, tx * TILE_SIZE, ty * TILE_SIZE) >= 4) return;
 
 	let mine = 0;
 	for (const b of w.entities) {

@@ -169,7 +169,7 @@ describe('beweging', () => {
 		expect([...seen].sort((a, b) => a - b)).toEqual([2, 3, 4, 5]);
 	});
 
-	it('kan wél draaien vanuit stilstand midden op een tegel', () => {
+	it('onthoudt een bocht die nog niet kon en pakt hem op de rand', () => {
 		// Anders zit je klem: draaien vraagt om uitgelijnd zijn, uitgelijnd raken vraagt om
 		// bewegen, en bewegen kan alleen langs de as waar je al op zat.
 		const w = makeWorld(['X....', '.....', '....A']);
@@ -179,8 +179,30 @@ describe('beweging', () => {
 		run(w, 2); // loslaten, ergens midden op een tegel
 		expect(p.moving).toBe(false);
 
+		const xBefore = p.x;
 		update(w, [press({ down: true }), undefined]);
+
+		// Nog niet gedraaid, en vooral: niet verschoven. Dat verspringen zag eruit als een hapering.
+		expect(p.dir).toBe(Dir.RIGHT);
+		expect(p.x).toBeGreaterThanOrEqual(xBefore);
+
+		// Binnen één tegel schuift hij door tot de rand en pakt dan alsnog de bocht.
+		for (let i = 0; i < 20 && p.dir !== Dir.DOWN; ++i) {
+			update(w, [press({ down: true }), undefined]);
+		}
 		expect(p.dir).toBe(Dir.DOWN);
+	});
+
+	it('laat een gebufferde bocht vallen zodra je de toets loslaat', () => {
+		const w = makeWorld(['X....', '.....', '....A']);
+		const p = ents(w, 'player')[0]!;
+
+		run(w, 5, press({ right: true }));
+		update(w, [press({ down: true }), undefined]);
+		expect(p.queuedDir).toBe(Dir.DOWN);
+
+		update(w, [NO_INPUT, undefined]);
+		expect(p.queuedDir).toBe(Dir.NONE);
 	});
 
 	it('mag pas van as wisselen als hij op het raster staat', () => {

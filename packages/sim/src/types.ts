@@ -120,6 +120,8 @@ export interface Entity {
 	teleportCd?: number;
 	/** één tick lang waar na een warp; de vijand-AI kiest dan een nieuwe richting */
 	justWarped?: boolean;
+	/** gevraagde bocht die nog niet kon; wordt gepakt zodra de entity op het raster staat */
+	queuedDir?: Direction;
 	/** animatie-fase, puur cosmetisch maar wel in de snapshot zodat clients gelijk lopen */
 	animT: number;
 }
@@ -190,6 +192,8 @@ export interface World {
 	extraGame: boolean;
 	extraGameTriggered: boolean;
 	extraGameT: number;
+	/** Had dit level überhaupt munten? Zo niet, dan is er geen extra game te verdienen. */
+	hadCoins: boolean;
 
 	players: PlayerState[];
 	enemyDefs: RawEnemy[];

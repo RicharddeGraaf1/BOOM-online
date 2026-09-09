@@ -99,7 +99,6 @@ export function updateEnemies(w: World, dt: number): void {
 	for (const e of w.entities) {
 		if (e.kind !== 'enemy') continue;
 
-		e.animT += dt;
 		if (e.shieldT > 0) e.shieldT = Math.max(0, e.shieldT - dt);
 		if (e.rechargeT !== undefined && e.rechargeT > 0) e.rechargeT -= dt;
 		if (e.dead) continue;
@@ -304,7 +303,6 @@ export function updateBullets(w: World, dt: number): void {
 	for (const b of w.entities) {
 		if (b.kind !== 'bullet' || b.dead) continue;
 
-		b.animT += dt;
 		const step = b.speed * dt;
 		b.x += (b.vx ?? 0) * step;
 		b.y += (b.vy ?? 0) * step;
@@ -355,7 +353,6 @@ const BIG_ALIEN_BOSS = {
 export function updateBosses(w: World, dt: number): void {
 	for (const b of w.entities) {
 		if (b.kind !== 'boss') continue;
-		b.animT += dt;
 		if (b.shieldT > 0) b.shieldT = Math.max(0, b.shieldT - dt);
 		if (b.dead) continue;
 
