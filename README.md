@@ -55,6 +55,10 @@ In **Instellingen** staat de beeldmodus:
   en omdat de textuur vier keer zoveel pixels heeft ook op een 4K-scherm nog scherp. Er wordt
   geen kleur verzonnen die niet in het origineel zat.
 
+Het spel slaat bij elke levelwissel automatisch op; op het titelscherm staat dan **Verder
+spelen**. Via **Level kiezen** spring je naar elk van de 80 levels, met een keuze voor het
+aantal spelers. Beide gelden alleen lokaal — online houdt de server de stand bij.
+
 Groter beeld: **F** schakelt volledig scherm. Daarnaast kun je *Venster vullen* aanzetten, wat
 de hele schaalfactor loslaat — dat scheelt veel: bij 1,25× aan beschikbare ruimte blijft de
 hele factor steken op 1× en gaat een kwart van het beeld verloren. De prijs is dat game-pixels

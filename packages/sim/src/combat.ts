@@ -170,6 +170,7 @@ export function destroyBreakable(w: World, tx: number, ty: number, byPlayer: num
 	// Meteen uit het botsingsraster halen; de sloopanimatie loopt daarna nog even door.
 	w.breakable[gridIndex(w, tx, ty)] = 0;
 	addScore(w, byPlayer, SCORE.BREAKABLE, wall.x, wall.y);
+	sound(w, 'wall_break.ogg');
 
 	const roll = weightedIndex(w.rng, BONUS_WEIGHTS as unknown as number[]);
 	if (roll < BONUS.N_BONUS_TYPES) {

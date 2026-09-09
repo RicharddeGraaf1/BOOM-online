@@ -233,7 +233,7 @@ function updateClock(w: World, dt: number): void {
 	if (!w.hurryUpWarned && w.timeLeft <= HURRY_UP_WARN_AT) {
 		w.hurryUpWarned = true;
 		emit(w, { t: 'text', name: 'hurryUp' });
-		emit(w, { t: 'sound', name: 'hurry_up.ogg' });
+		emit(w, { t: 'sound', name: 'hurryup.ogg' });
 	} else if (!w.hurryUp && w.timeLeft <= HURRY_UP_AT) {
 		triggerHurryUp(w);
 	}
@@ -269,7 +269,7 @@ function triggerExtraGame(w: World): void {
 	w.extraGameT = EXTRA_GAME_DURATION;
 	for (const e of w.entities) if (e.kind === 'enemy' && !e.dead) e.morphed = true;
 	emit(w, { t: 'text', name: 'extraGame' });
-	emit(w, { t: 'sound', name: 'extra_game.ogg' });
+	emit(w, { t: 'sound', name: 'extragame.ogg' });
 }
 
 function endExtraGame(w: World): void {
@@ -354,7 +354,8 @@ function checkConditions(w: World): void {
 	if (living === 0) {
 		const anyContinues = w.players.some((p) => p.present && p.continues > 0);
 		w.status = anyContinues ? 'retry' : 'gameover';
-		emit(w, { t: 'text', name: anyContinues ? 'gameOver' : 'gameOver' });
+		emit(w, { t: 'text', name: 'gameOver' });
+		emit(w, { t: 'sound', name: 'gameover.ogg' });
 		return;
 	}
 
@@ -362,7 +363,9 @@ function checkConditions(w: World): void {
 	const foes = w.entities.some((e) => (e.kind === 'enemy' || e.kind === 'boss') && !e.dead);
 	if (!foes) {
 		w.status = 'cleared';
+		w.clearedT = 0;
 		emit(w, { t: 'text', name: 'levelClear' });
+		emit(w, { t: 'sound', name: 'levelclear.ogg' });
 	}
 
 	// Tijd op is in BOOM geen game over: de klok blijft op nul staan en de hurry-up maakt

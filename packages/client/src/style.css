@@ -263,6 +263,36 @@ li .state.ready {
 	color: #4fbf5c;
 }
 
+.panel.wide {
+	width: min(96vw, 560px);
+}
+
+/* Tachtig levels; een raster dat zich naar de breedte voegt in plaats van een lange lijst. */
+.level-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+	gap: 4px;
+	max-height: 44vh;
+	overflow-y: auto;
+	padding-right: 4px;
+}
+
+.level-grid button {
+	padding: 8px 0;
+	text-align: center;
+	min-width: 0;
+}
+
+.level-grid button.chosen {
+	border-color: var(--amber);
+	color: var(--amber);
+}
+
+#level-players button[aria-pressed="true"] {
+	border-color: var(--amber);
+	color: var(--amber);
+}
+
 /*
  * Melding over het spel heen, bijvoorbeeld terwijl je meekijkt tot het volgende level.
  * Bewust geen overlay: je moet er dwars doorheen kunnen blijven kijken.

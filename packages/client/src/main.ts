@@ -25,8 +25,9 @@ import { Hud, loadPanelFont } from './render/hud.js';
 import { Audio } from './audio.js';
 import { Input } from './input.js';
 import { NetClient } from './net.js';
+import { clearSave, describeSave, loadGame, saveGame } from './save.js';
 
-type Screen = 'title' | 'join' | 'lobby' | 'pause' | 'options' | 'gameover' | 'none';
+type Screen = 'title' | 'join' | 'lobby' | 'pause' | 'options' | 'levels' | 'gameover' | 'none';
 type Mode = 'local' | 'online';
 
 const $ = <T extends HTMLElement>(sel: string): T => document.querySelector<T>(sel)!;
@@ -43,6 +44,7 @@ const SCREENS: Record<Exclude<Screen, 'none'>, string> = {
 	lobby: '#screen-lobby',
 	pause: '#screen-pause',
 	options: '#screen-options',
+	levels: '#screen-levels',
 	gameover: '#screen-gameover',
 };
 
@@ -220,7 +222,11 @@ async function boot(): Promise<void> {
 	resize();
 
 	// ── Spel starten ──────────────────────────────────────────────────
-	async function startLocal(nPlayers: number): Promise<void> {
+	async function startLocal(
+		nPlayers: number,
+		startLevel = 1,
+		players?: Game['players'],
+	): Promise<void> {
 		mode = 'local';
 		net?.disconnect();
 		net = null;
@@ -228,11 +234,54 @@ async function boot(): Promise<void> {
 			levelSet: sets.original,
 			...(sets.fourPlayer ? { fourPlayerSet: sets.fourPlayer } : {}),
 			nPlayers,
+			startLevel,
+			...(players ? { players } : {}),
 		});
 		paused = false;
 		await audio.unlock();
 		show('none');
 		status(`Level ${game.world.levelNum}`);
+	}
+
+	/** Zet de knop "Verder spelen" klaar als er iets te hervatten valt. */
+	function refreshContinue(): void {
+		const save = loadGame();
+		const btn = $<HTMLButtonElement>('#btn-continue');
+		btn.hidden = save === null;
+		if (save) btn.textContent = `Verder spelen — ${describeSave(save)}`;
+	}
+
+	// ── Level kiezen ──────────────────────────────────────────────────
+	let chosenPlayers = 1;
+
+	function buildLevelPicker(): void {
+		const counts = $('#level-players');
+		counts.innerHTML = '';
+		for (let n = 1; n <= 4; ++n) {
+			const btn = document.createElement('button');
+			btn.textContent = n === 1 ? '1 speler' : `${n} spelers`;
+			btn.setAttribute('aria-pressed', String(n === chosenPlayers));
+			btn.disabled = n > 2 && !sets.fourPlayer;
+			if (btn.disabled)
+				btn.title = 'Draai eerst `npm run spawns` om spawnpunten voor speler 3 en 4 te maken.';
+			btn.addEventListener('click', () => {
+				chosenPlayers = n;
+				buildLevelPicker();
+			});
+			counts.appendChild(btn);
+		}
+
+		const grid = $('#level-grid');
+		grid.innerHTML = '';
+		for (const level of sets.original.levels) {
+			const btn = document.createElement('button');
+			btn.textContent = String(level.num);
+			btn.addEventListener('click', () => {
+				clearSave();
+				void startLocal(chosenPlayers, level.num);
+			});
+			grid.appendChild(btn);
+		}
 	}
 
 	function startOnline(room: string): void {
@@ -290,6 +339,7 @@ async function boot(): Promise<void> {
 
 	function quitToMenu(): void {
 		toast(null);
+		refreshContinue();
 		net?.disconnect();
 		net = null;
 		game = null;
@@ -307,9 +357,20 @@ async function boot(): Promise<void> {
 
 		switch (action) {
 			case 'solo':
+				clearSave();
 				void startLocal(1);
 				break;
+			case 'continue': {
+				const save = loadGame();
+				if (save) void startLocal(save.nPlayers, save.levelNum, save.players);
+				break;
+			}
+			case 'levels':
+				buildLevelPicker();
+				show('levels');
+				break;
 			case 'coop-local':
+				clearSave();
 				void startLocal(Number(target.dataset['players'] ?? 2));
 				break;
 			case 'host':
@@ -346,6 +407,7 @@ async function boot(): Promise<void> {
 				show('options');
 				break;
 			case 'back':
+				if (!game || !paused) refreshContinue();
 				show(game && paused ? 'pause' : 'title');
 				break;
 			case 'quit':
@@ -497,6 +559,9 @@ async function boot(): Promise<void> {
 			await gameView.prepareLevel(g.world);
 			void audio.playMusic(g.track);
 			status(`Level ${g.world.levelNum}`);
+
+			// Bij elke levelwissel opslaan. Online niet: daar houdt de server de stand bij.
+			if (mode === 'local') saveGame(g.world.levelNum, g.nPlayers, g.players);
 		} catch (err) {
 			// Blijft dit hangen, dan zie je niets meer; dus melden en opnieuw laten proberen.
 			renderedWorld = null;
@@ -522,6 +587,7 @@ async function boot(): Promise<void> {
 		$<HTMLInputElement>('#room-code').value = roomParam.toUpperCase();
 		startOnline(roomParam.toUpperCase());
 	} else {
+		refreshContinue();
 		show('title');
 		status('Klaar');
 	}

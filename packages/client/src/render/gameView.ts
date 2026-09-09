@@ -34,6 +34,11 @@ const COIN_FRAME_TIME = 0.02;
 /** Kleur van de schildrand om een speler. */
 const SHIELD_COLOUR = 0xffcc00;
 
+/** Sleutel waaronder het gele silhouet van een spelerssheet in de texturentabel staat. */
+function shieldKey(playerId: number): string {
+	return `shield:player${playerSheet(playerId)}.png`;
+}
+
 /** De z-conventie van het origineel is omgekeerd: z >= 0 onder de border, z < 0 erboven. */
 function toPixiZ(lifishZ: number): number {
 	return lifishZ >= 0 ? lifishZ : BORDER_Z - lifishZ;
@@ -67,18 +72,21 @@ interface View {
 	/** hoofdsprite; explosies hebben er meer, die staan in `extra` */
 	main: Sprite;
 	extra?: { h: TilingSprite; v: TilingSprite };
-	/** vier kopieën met één pixel verschuiving; samen vormen ze de schildrand */
-	outline?: Sprite[];
+	/** het schildharnas: een vergrote kopie van de sprite in één kleur, eroverheen */
+	shield?: Sprite;
 	kind: string;
 }
 
-/** Verschuivingen voor de omtrek: links, rechts, boven, onder. */
-const OUTLINE_OFFSETS: readonly (readonly [number, number])[] = [
-	[-1, 0],
-	[1, 0],
-	[0, -1],
-	[0, 1],
-];
+/**
+ * Het schild. Het origineel tekent de spelerssprite nog een keer op 1,2x en drie pixels
+ * verschoven, door een shader die elke pixel overschrijft — groen, op halve dekking
+ * (Player.cpp:388-427). Wij houden de vorm aan maar maken hem geel, zoals in BOOM zelf.
+ */
+const SHIELD_SCALE = 1.2;
+const SHIELD_OFFSET = -3;
+const SHIELD_ALPHA = 0.55;
+/** Als CSS-kleur, want het silhouet wordt op een canvas gemaakt. */
+const SHIELD_CSS = '#ffcc00';
 
 export class GameView {
 	readonly root = new Container();
@@ -113,6 +121,16 @@ export class GameView {
 		// niet genoeg: deze klasse heeft zijn eigen tabel, en `get()` gooit als een sheet
 		// daar ontbreekt. Dat was precies de fout die het speelveld zwart liet.
 		await Promise.all(sheetsNeededFor(w).map((f) => this.cache(f)));
+
+		// De gele silhouetten voor het schild, één keer per spelerssheet.
+		await Promise.all(
+			[1, 2].map(async (id) => {
+				const key = shieldKey(id);
+				if (this.textures.has(key)) return;
+				this.textures.set(key, await this.sheets.solid(`player${id}.png`, SHIELD_CSS));
+			}),
+		);
+
 		this.ready = true;
 
 		this.clearEntities();
@@ -228,7 +246,7 @@ export class GameView {
 		root.addChild(main);
 
 		let extra: View['extra'];
-		let outline: Sprite[] | undefined;
+		let shield: Sprite | undefined;
 
 		switch (e.kind) {
 			case 'explosion': {
@@ -258,19 +276,14 @@ export class GameView {
 				break;
 			case 'player': {
 				root.zIndex = toPixiZ(zindex.PLAYERS);
-				// De schildrand: vier gekleurde kopieën één pixel opzij, achter de sprite.
-				// Het origineel doet dit met een shader (PlayerDrawProxy); dit is hetzelfde
-				// effect met de middelen die we hier hebben.
-				outline = OUTLINE_OFFSETS.map(([ox, oy]) => {
-					const s = new Sprite();
-					s.scale.set(1 / this.sheets.textureScale);
-					s.x = ox;
-					s.y = oy;
-					s.tint = SHIELD_COLOUR;
-					s.visible = false;
-					root.addChildAt(s, 0);
-					return s;
-				});
+				shield = new Sprite();
+				shield.scale.set(SHIELD_SCALE / this.sheets.textureScale);
+				shield.x = SHIELD_OFFSET;
+				shield.y = SHIELD_OFFSET;
+				shield.alpha = SHIELD_ALPHA;
+				shield.visible = false;
+				// Erbovenop, net als PlayerDrawProxy: eerst de speler, dan het harnas.
+				root.addChild(shield);
 				break;
 			}
 			case 'enemy':
@@ -289,7 +302,7 @@ export class GameView {
 		// Optionele velden alleen meegeven als ze er zijn: exactOptionalPropertyTypes staat aan.
 		const view: View = { root, main, kind: e.kind };
 		if (extra) view.extra = extra;
-		if (outline) view.outline = outline;
+		if (shield) view.shield = shield;
 		return view;
 	}
 
@@ -360,13 +373,15 @@ export class GameView {
 		const frame = e.moving ? Math.floor(e.animT / 0.07) % 8 : 0;
 		view.main.texture = this.sheets.tile(sheet, frame, row);
 
-		// Schild: een gele rand om het poppetje, die in de laatste drie seconden knippert.
-		// src/lifish/entities/Player.cpp:410-417.
+		// Het harnas knippert in de laatste drie seconden. src/lifish/entities/Player.cpp:410-417.
 		const diff = e.shieldT - Math.floor(e.shieldT);
 		const shown = e.shieldT > 0 && (e.shieldT > 3 || 4 * diff - Math.floor(4 * diff) < 0.5);
-		for (const s of view.outline ?? []) {
-			s.visible = shown;
-			if (shown) s.texture = view.main.texture;
+		if (view.shield) {
+			view.shield.visible = shown;
+			const silhouette = this.textures.get(shieldKey(id));
+			if (shown && silhouette) {
+				view.shield.texture = this.sheets.tile(silhouette, frame, row);
+			}
 		}
 	}
 

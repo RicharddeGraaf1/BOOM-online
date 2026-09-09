@@ -14,12 +14,14 @@
 			<section class="panel" id="screen-title">
 				<h1>BOOM<span>online</span></h1>
 				<div class="menu">
+					<button data-action="continue" id="btn-continue" hidden></button>
 					<button data-action="solo">Eén speler</button>
 					<button data-action="coop-local" data-players="2">Co-op met 2 op één toetsenbord</button>
 					<button data-action="coop-local" data-players="3">Co-op met 3 op één toetsenbord</button>
 					<button data-action="coop-local" data-players="4">Co-op met 4 op één toetsenbord</button>
 					<button data-action="host">Online kamer openen</button>
 					<button data-action="join">Kamer binnenlopen</button>
+					<button data-action="levels">Level kiezen</button>
 					<button data-action="options">Instellingen</button>
 					<button data-action="fullscreen">Volledig scherm</button>
 				</div>
@@ -70,6 +72,16 @@
 					<button data-action="resume">Verder spelen</button>
 					<button data-action="options">Instellingen</button>
 					<button data-action="quit">Terug naar het menu</button>
+				</div>
+			</section>
+
+			<!-- Level kiezen -->
+			<section class="panel wide" id="screen-levels" hidden>
+				<h2>Level kiezen</h2>
+				<div class="menu row" id="level-players"></div>
+				<div class="level-grid" id="level-grid"></div>
+				<div class="menu row">
+					<button data-action="back">Terug</button>
 				</div>
 			</section>
 

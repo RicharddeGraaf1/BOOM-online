@@ -70,6 +70,8 @@ export class Sheets {
 	readonly textureScale: number;
 
 	private readonly cache = new Map<string, Promise<Texture>>();
+	private readonly pixelCache = new Map<string, Promise<HTMLCanvasElement>>();
+	private readonly solidCache = new Map<string, Promise<Texture>>();
 
 	constructor(mode: RenderMode) {
 		this.mode = mode;
@@ -102,6 +104,65 @@ export class Sheets {
 		const canvas = upscaleImage(img, img.naturalWidth, img.naturalHeight, CELL_SIZES[file]);
 		const source = new CanvasSource({ resource: canvas, scaleMode: 'linear' });
 		return new Texture({ source });
+	}
+
+	/** De sheet als canvas, met dezelfde opschaling als de gewone textuur. */
+	private pixels(file: string): Promise<HTMLCanvasElement> {
+		let p = this.pixelCache.get(file);
+		if (!p) {
+			p = (async () => {
+				const img = await loadImage(`${GRAPHICS}/${file}`);
+				if (this.mode === 'smooth')
+					return upscaleImage(img, img.naturalWidth, img.naturalHeight, CELL_SIZES[file]);
+
+				const canvas = document.createElement('canvas');
+				canvas.width = img.naturalWidth;
+				canvas.height = img.naturalHeight;
+				const ctx = canvas.getContext('2d')!;
+				ctx.imageSmoothingEnabled = false;
+				ctx.drawImage(img, 0, 0);
+				return canvas;
+			})();
+			this.pixelCache.set(file, p);
+		}
+		return p;
+	}
+
+	/**
+	 * Dezelfde sheet, maar elke zichtbare pixel in één kleur.
+	 *
+	 * Tint kan dit niet: die vermenigvuldigt, en de spelerssprite is grotendeels donker —
+	 * geel maal zwart is nog steeds zwart. Het origineel lost dat op met een fragment-shader
+	 * die elke pixel overschrijft (Player.cpp:388-401); dit is hetzelfde resultaat via het
+	 * canvas, één keer bij het laden.
+	 */
+	solid(file: string, colour: string): Promise<Texture> {
+		const key = `${file}|${colour}`;
+		let p = this.solidCache.get(key);
+		if (!p) {
+			p = (async () => {
+				const src = await this.pixels(file);
+				const out = document.createElement('canvas');
+				out.width = src.width;
+				out.height = src.height;
+
+				const ctx = out.getContext('2d')!;
+				ctx.imageSmoothingEnabled = false;
+				ctx.drawImage(src, 0, 0);
+				// 'source-in' houdt de doorzichtigheid en vervangt alleen de kleur.
+				ctx.globalCompositeOperation = 'source-in';
+				ctx.fillStyle = colour;
+				ctx.fillRect(0, 0, out.width, out.height);
+
+				const source = new CanvasSource({
+					resource: out,
+					scaleMode: this.mode === 'smooth' ? 'linear' : 'nearest',
+				});
+				return new Texture({ source });
+			})();
+			this.solidCache.set(key, p);
+		}
+		return p;
 	}
 
 	/** Een deelvlak van een sheet, opgegeven in logische spelpixels. */

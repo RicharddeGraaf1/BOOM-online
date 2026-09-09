@@ -143,11 +143,11 @@ function handlePickups(w: World, player: Entity): void {
 				const idx = e.letter ?? 0;
 				ps.letters[idx] = true;
 				addScore(w, player.playerId ?? 1, SCORE.LETTER, e.x, e.y);
-				sound(w, 'letter.ogg');
+				sound(w, 'letter_grab.ogg');
 				if (ps.letters.every(Boolean)) {
 					ps.letters = [false, false, false, false, false];
 					ps.remainingLives++;
-					sound(w, 'extra_life.ogg');
+					sound(w, 'extralife.ogg');
 				}
 				break;
 			}

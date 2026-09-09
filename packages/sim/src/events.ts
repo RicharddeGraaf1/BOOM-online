@@ -4,7 +4,7 @@
  */
 
 import { bonus as BONUS } from './constants.js';
-import type { GameEvent, World } from './types.js';
+import type { GameEvent, SoundName, World } from './types.js';
 
 export const SCORE = {
 	COIN: 150,
@@ -21,7 +21,7 @@ export function emit(w: World, ev: GameEvent): void {
 	w.events.push(ev);
 }
 
-export function sound(w: World, name: string): void {
+export function sound(w: World, name: SoundName): void {
 	w.events.push({ t: 'sound', name });
 }
 

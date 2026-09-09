@@ -157,8 +157,46 @@ export function defaultPowers(): PlayerState['powers'] {
 	};
 }
 
+/**
+ * De geluiden die er zijn.
+ *
+ * Als union en niet als `string`, want een naam die niet bestaat geeft nergens een signaal:
+ * de client haalt het bestand op, krijgt een 404 en speelt stilletjes niets af. Zo bleef het
+ * oprapen van een letter stil omdat het bestand `letter_grab.ogg` heet en ik `letter.ogg`
+ * schreef. Nu is dat een compilerfout.
+ */
+export type SoundName =
+	| 'alien_death.ogg'
+	| 'alienboss_death.ogg'
+	| 'alienboss_hurt.ogg'
+	| 'big_alien_boss_death.ogg'
+	| 'big_alien_boss_hurt.ogg'
+	| 'bonus_grab.ogg'
+	| 'coin.ogg'
+	| 'egg_crack.ogg'
+	| 'egg_spawn.ogg'
+	| 'explosion.ogg'
+	| 'extragame.ogg'
+	| 'extralife.ogg'
+	| 'fuse.ogg'
+	| 'gameover.ogg'
+	| 'hurryup.ogg'
+	| 'letter_grab.ogg'
+	| 'levelclear.ogg'
+	| 'teleport.ogg'
+	| 'timebonus.ogg'
+	| 'wall_break.ogg'
+	| `bullet${number}_hit.ogg`
+	| `bullet${number}_shot.ogg`
+	| `enemy${number}_attack.ogg`
+	| `enemy${number}_death.ogg`
+	| `enemy${number}_yell.ogg`
+	| `player${number}_death.ogg`
+	| `player${number}_hurt.ogg`
+	| `player${number}_win.ogg`;
+
 export type GameEvent =
-	| { t: 'sound'; name: string }
+	| { t: 'sound'; name: SoundName }
 	| { t: 'fx'; name: 'flash' | 'teleport'; x: number; y: number }
 	| { t: 'points'; value: number; x: number; y: number; boss?: boolean }
 	| { t: 'text'; name: 'hurryUp' | 'extraGame' | 'gameOver' | 'levelClear' };
