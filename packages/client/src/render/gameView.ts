@@ -11,15 +11,18 @@
 
 import { Container, Sprite, Texture, TilingSprite } from 'pixi.js';
 import {
+	COIN_GRAB_TIME,
 	Dir,
 	GAME_HEIGHT,
 	GAME_WIDTH,
 	TILE_SIZE,
+	LETTER_HOLD,
 	zindex,
 	type Direction,
 	type Entity,
 	type World,
 } from '@boom/sim';
+import { ALIEN_DEATH, alienCell, enemyCell, letterCell, playerRow } from './frames.js';
 import { playerSheet, playerTint } from './playerColors.js';
 import { sheetsNeededFor } from './sheetNames.js';
 import type { Sheets } from './sheets.js';
@@ -58,61 +61,6 @@ const BULLET_DIRECTIONALITY: Record<number, number> = {
 	7: 4,
 	101: 1,
 };
-
-/** Rij in de spelersheet per kijkrichting. src/lifish/entities/Player.cpp:269-279 */
-function playerRow(dir: Direction): number {
-	switch (dir) {
-		case Dir.UP:
-			return 1;
-		case Dir.RIGHT:
-			return 2;
-		case Dir.LEFT:
-			return 3;
-		default:
-			return 0;
-	}
-}
-
-/**
- * aliensprite.png is 9 kolommen bij 2 rijen. De indeling is anders dan bij de gewone
- * vijanden en loopt over de rijgrens heen. src/lifish/components/AlienSprite.cpp:24-49.
- */
-function alienCell(dir: Direction, frame: number): { col: number; row: number } {
-	switch (dir) {
-		case Dir.UP:
-			return { col: 4 + frame, row: 0 };
-		case Dir.RIGHT:
-			// kolom 8 op rij 0, daarna 0..2 op rij 1
-			return frame === 0 ? { col: 8, row: 0 } : { col: frame - 1, row: 1 };
-		case Dir.LEFT:
-			return { col: 3 + frame, row: 1 };
-		default:
-			return { col: frame, row: 0 };
-	}
-}
-
-/** De twee sterfframes van de alien: kolom 7 en 8 op rij 1. */
-const ALIEN_DEATH: readonly { col: number; row: number }[] = [
-	{ col: 7, row: 1 },
-	{ col: 8, row: 1 },
-];
-
-/**
- * Kolom en rij in de vijandsheet. Anders opgebouwd dan de speler: down en up delen rij 0,
- * right en left rij 1, elk met vier frames. src/lifish/entities/Enemy.cpp:120-141
- */
-function enemyCell(dir: Direction, frame: number): { col: number; row: number } {
-	switch (dir) {
-		case Dir.UP:
-			return { col: 4 + frame, row: 0 };
-		case Dir.RIGHT:
-			return { col: frame, row: 1 };
-		case Dir.LEFT:
-			return { col: 4 + frame, row: 1 };
-		default:
-			return { col: frame, row: 0 };
-	}
-}
 
 interface View {
 	root: Container;
@@ -369,10 +317,7 @@ export class GameView {
 				this.drawBreakable(view, e, w);
 				break;
 			case 'coin':
-				// 0,02 s per frame — src/lifish/entities/Coin.cpp:62. Vier keer sneller dan wat
-				// ik ervan gemaakt had; op deze snelheid leest het als glinstering in plaats
-				// van als een ronddraaiend ding dat je aandacht opeist.
-				view.main.texture = this.animTile('coin.png', e.animT, 10, COIN_FRAME_TIME);
+				this.drawCoin(view, e);
 				break;
 			case 'teleport':
 				view.main.texture = this.animTile('teleport.png', e.animT, 8, 0.07);
@@ -381,7 +326,7 @@ export class GameView {
 				this.drawBonus(view, e);
 				break;
 			case 'letter':
-				view.main.texture = this.sheets.tile(this.get('extra_letters.png'), e.letter ?? 0, 0);
+				this.drawLetter(view, e);
 				break;
 			case 'bullet':
 				this.drawBullet(view, e);
@@ -512,6 +457,36 @@ export class GameView {
 		const row = w.tileIDs.breakable - 1;
 		const col = e.dead ? Math.min(3, 1 + Math.floor(e.deadT / 0.08)) : 0;
 		view.main.texture = this.sheets.tile(this.get('breakable.png'), col, row);
+	}
+
+	/**
+	 * Een munt draait niet uit zichzelf. Coin.cpp zet de animatie op pause() en start hem pas
+	 * in _grab(): de draaiing ís de pak-animatie. Dat had ik verkeerd om — vandaar dat alle
+	 * munten permanent stonden rond te tollen en er bij het oppakken niets gebeurde.
+	 */
+	private drawCoin(view: View, e: Entity): void {
+		const sheet = this.get('coin.png');
+		if (!e.dead) {
+			view.main.texture = this.sheets.tile(sheet, 0);
+			return;
+		}
+		const frame = Math.floor(e.deadT / COIN_FRAME_TIME) % 10;
+		view.main.texture = this.sheets.tile(sheet, frame);
+		view.root.alpha = Math.max(0, 1 - e.deadT / COIN_GRAB_TIME);
+	}
+
+	/**
+	 * De vijf EXTRA-letters staan niet als vijf losse plaatjes in de sheet: er zijn er twintig,
+	 * en letter i begint op index i*4, met daartussen drie morf-frames naar de volgende. Op
+	 * kolom `letter` kijken leverde dus een half omgevormde letter op.
+	 * src/lifish/entities/Letter.cpp:61-77.
+	 */
+	private drawLetter(view: View, e: Entity): void {
+		const letter = e.letter ?? 0;
+		const t = e.t ?? 0;
+		const step = t < LETTER_HOLD ? 0 : Math.min(4, 1 + Math.floor((t - LETTER_HOLD) / 0.1));
+		const { col, row } = letterCell(letter, step);
+		view.main.texture = this.sheets.tile(this.get('extra_letters.png'), col, row);
 	}
 
 	private drawBonus(view: View, e: Entity): void {

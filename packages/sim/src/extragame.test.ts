@@ -3,7 +3,8 @@ import { Game } from './game.js';
 import { killEnemy } from './combat.js';
 import { parseLevelSet, type LevelSet, type RawLevelSet } from './levelset.js';
 import { EXTRA_GAME_DURATION } from './constants.js';
-import { LEVEL_CLEAR_GRACE } from './world.js';
+import { COIN_GRAB_TIME, LEVEL_CLEAR_GRACE } from './world.js';
+import { LETTER_CYCLE } from './combat.js';
 import { NO_INPUT, type Entity, type PlayerInput } from './types.js';
 
 /**
@@ -145,6 +146,39 @@ describe('aanraking met een vijand', () => {
 
 		run(game, 2);
 		expect(player.hp).toBe(before);
+	});
+});
+
+describe('munt en letter', () => {
+	/**
+	 * De munt draait niet uit zichzelf: Coin.cpp zet de animatie op pause() en start hem pas
+	 * bij het oppakken. Hij moet dus na het grijpen nog even blijven bestaan, anders is er
+	 * niets om die draai op te tekenen.
+	 */
+	it('laat een opgeraapte munt nog even liggen om zijn draai af te maken', () => {
+		const game = newGame();
+		run(game, 40, press({ right: true }));
+
+		const grabbed = game.world.entities.filter((e) => e.kind === 'coin' && e.dead);
+		expect(grabbed.length).toBeGreaterThan(0);
+		expect(COIN_GRAB_TIME).toBeGreaterThan(0.3);
+	});
+
+	it('morft een gevallen letter door naar de volgende', () => {
+		const game = newGame();
+		run(game, 120, press({ right: true }));
+
+		const player = game.world.entities.find((e) => e.kind === 'player')!;
+		const enemy = game.world.entities.find((e) => e.kind === 'enemy') as Entity;
+		// Ver weg neerleggen, anders raapt de speler hem meteen op.
+		enemy.x = player.x + 96;
+		killEnemy(game.world, enemy, 1);
+
+		const letter = game.world.entities.find((e) => e.kind === 'letter')!;
+		const first = letter.letter;
+
+		run(game, Math.ceil(LETTER_CYCLE * 60) + 2);
+		expect(letter.letter).toBe(((first ?? 0) + 1) % 5);
 	});
 });
 

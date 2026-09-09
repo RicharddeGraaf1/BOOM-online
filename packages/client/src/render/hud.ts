@@ -7,7 +7,7 @@
  * plaats van acht hartjes: acht sprites van 17 pixels passen simpelweg niet naast elkaar.
  */
 
-import { Container, Graphics, Sprite, Text, TextStyle, Texture } from 'pixi.js';
+import { Container, Sprite, Text, TextStyle, Texture } from 'pixi.js';
 import {
 	MAX_PLAYERS,
 	bonus as BONUS,
@@ -30,7 +30,18 @@ const HEADER_TOP = 62;
 const BLOCK_TOP = 90;
 const BLOCK_HEIGHT = 86;
 /** Bij één of twee spelers is er ruimte zat; dan mogen de blokken uit elkaar staan. */
-const BLOCK_HEIGHT_ROOMY = 140;
+const BLOCK_HEIGHT_ROOMY = 170;
+
+/** health.png: drie vakjes van 17x18. Frame 0 is leeg, 1 half, 2 vol (SidePanel.hpp:71-73). */
+const HEART_W = 17;
+const HEART_H = 18;
+const HEARTS = 8;
+const HEART_EMPTY = 0;
+const HEART_HALF = 1;
+const HEART_FULL = 2;
+/** extra_icons.png: zes vakjes van 14x15. */
+const EXTRA_W = 14;
+const EXTRA_H = 15;
 
 /** De originele bitmapfont, zodat de cijfers precies zo staan als in het spel. */
 export async function loadPanelFont(): Promise<void> {
@@ -56,10 +67,14 @@ interface PlayerBlock {
 	score: Text;
 	lives: Text;
 	bombs: Text;
-	health: Graphics;
+	/** Acht hartjes in twee rijen van vier, zoals SidePanel::_drawHealth. */
+	hearts: Sprite[];
 	icons: Sprite[];
 	/** Aantal onder het icoon, voor de upgrades die een niveau hebben. */
 	counts: Text[];
+	/** Icoontjes plus de EXTRA-letters; die passen alleen als er ruimte is. */
+	extras: Container;
+	letters: Sprite[];
 }
 
 export class Hud {
@@ -68,6 +83,8 @@ export class Hud {
 	private readonly sheets: Sheets;
 	private readonly blocks: PlayerBlock[] = [];
 	private bg: Sprite | null = null;
+	private healthSheet: Texture | null = null;
+	private extraSheet: Texture | null = null;
 	private levelText = label(8, 0xffcc00);
 	private timeText = label(10, 0xffffff);
 	private statusText = label(8, 0xff6a3d);
@@ -80,6 +97,10 @@ export class Hud {
 		const panel = await this.sheets.sheet('panel.png');
 		const heads = await this.sheets.sheet('playerheads.png');
 		const icons = await this.sheets.sheet('bonus_icons.png');
+		const health = await this.sheets.sheet('health.png');
+		const extraIcons = await this.sheets.sheet('extra_icons.png');
+		this.healthSheet = health;
+		this.extraSheet = extraIcons;
 
 		this.bg = new Sprite(panel);
 		this.bg.scale.set(1 / this.sheets.textureScale);
@@ -91,14 +112,20 @@ export class Hud {
 		this.root.addChild(this.levelText, this.timeText, this.statusText);
 
 		for (let i = 0; i < MAX_PLAYERS; ++i) {
-			const block = this.makeBlock(heads, icons, i);
+			const block = this.makeBlock(heads, icons, health, extraIcons, i);
 			block.root.position.set(0, BLOCK_TOP + i * BLOCK_HEIGHT);
 			this.root.addChild(block.root);
 			this.blocks.push(block);
 		}
 	}
 
-	private makeBlock(heads: Texture, icons: Texture, index: number): PlayerBlock {
+	private makeBlock(
+		heads: Texture,
+		icons: Texture,
+		health: Texture,
+		extraIcons: Texture,
+		index: number,
+	): PlayerBlock {
 		const root = new Container();
 
 		// Er zijn maar twee koppen in playerheads.png; speler 3 en 4 lenen ze en krijgen
@@ -126,9 +153,21 @@ export class Hud {
 		bombs.position.set(40, 35);
 		root.addChild(bombs);
 
-		const health = new Graphics();
-		health.position.set(4, 48);
-		root.addChild(health);
+		// Acht hartjes in twee rijen van vier, 16 px uit elkaar bij een breedte van 17 — dus
+		// één pixel overlap, precies zoals SidePanel::_drawHealth het doet.
+		const hearts: Sprite[] = [];
+		for (let i = 0; i < HEARTS; ++i) {
+			const s = new Sprite(this.sheets.frame(health, 0, 0, HEART_W, HEART_H));
+			s.scale.set(1 / this.sheets.textureScale);
+			s.position.set(4 + (HEART_W - 1) * (i % 4), 47 + HEART_H * Math.floor(i / 4));
+			root.addChild(s);
+			hearts.push(s);
+		}
+
+		// Alles hieronder past alleen als er ruimte is; bij drie of vier spelers vervalt het.
+		const extras = new Container();
+		extras.y = 84;
+		root.addChild(extras);
 
 		// De vijf permanente bonussen als iconen van 15x15 uit bonus_icons.png, met daaronder
 		// het niveau. Alleen oplichten is niet genoeg: je begint al met vijf bommen, dus dat
@@ -138,18 +177,29 @@ export class Hud {
 		for (let i = 0; i < BONUS.N_PERMANENT_BONUS_TYPES; ++i) {
 			const s = new Sprite(this.sheets.frame(icons, i * 15, 0, 15, 15));
 			s.scale.set(1 / this.sheets.textureScale);
-			s.position.set(3 + i * 18, 56);
+			s.position.set(3 + i * 18, 0);
 			s.alpha = 0.25;
-			root.addChild(s);
+			extras.addChild(s);
 			iconSprites.push(s);
 
 			const c = label(8, 0xffffff);
-			c.position.set(5 + i * 18, 69);
-			root.addChild(c);
+			c.position.set(5 + i * 18, 13);
+			extras.addChild(c);
 			counts.push(c);
 		}
 
-		return { root, name, score, lives, bombs, health, icons: iconSprites, counts };
+		// De EXTRA-letters: extra_icons.png is 6 vakjes van 14x15, waarvan de eerste "nog
+		// niet" betekent en 1..5 de letters E, X, T, R, A. SidePanel::_drawExtraLetters.
+		const letters: Sprite[] = [];
+		for (let i = 0; i < 5; ++i) {
+			const s = new Sprite(this.sheets.frame(extraIcons, 0, 0, EXTRA_W, EXTRA_H));
+			s.scale.set(1 / this.sheets.textureScale);
+			s.position.set(6 + i * EXTRA_W, 26);
+			extras.addChild(s);
+			letters.push(s);
+		}
+
+		return { root, name, score, lives, bombs, hearts, icons: iconSprites, counts, extras, letters };
 	}
 
 	update(w: World, bombsLeft: (playerId: number) => number): void {
@@ -186,13 +236,24 @@ export class Hud {
 			block.lives.text = `x${ps.remainingLives}`;
 			block.bombs.text = `${bombsLeft(ps.id)}/${ps.powers.maxBombs} bom`;
 
-			const frac = Math.max(0, Math.min(1, ps.life / PLAYER.MAX_LIFE));
-			block.health
-				.clear()
-				.rect(0, 0, 88, 6)
-				.fill({ color: 0x000000, alpha: 0.5 })
-				.rect(0, 0, Math.round(88 * frac), 6)
-				.fill({ color: frac > 0.35 ? 0x33cc33 : 0xff3300 });
+			// Elk hartje is twee levenspunten waard; MAX_LIFE is 16, dus acht hartjes.
+			// SidePanel::_drawHealth:88-104.
+			const full = Math.floor(ps.life / 2);
+			const half = ps.life % 2;
+			for (let h = 0; h < block.hearts.length; ++h) {
+				const frame = h < full ? HEART_FULL : h < full + half ? HEART_HALF : HEART_EMPTY;
+				block.hearts[h]!.texture = this.sheets.frame(
+					this.healthSheet!,
+					frame * HEART_W,
+					0,
+					HEART_W,
+					HEART_H,
+				);
+			}
+
+			// Bij drie of vier spelers is er domweg geen ruimte voor de iconen; de aantallen
+			// staan dan nog steeds als tekst op de regel hierboven.
+			block.extras.visible = spacing >= BLOCK_HEIGHT_ROOMY;
 
 			// Volgorde van bonus_icons.png is die van BonusType: bommen, lont, bereik,
 			// schild, speedy. De eerste drie zijn blijvend en tonen hun niveau; de laatste
@@ -214,6 +275,17 @@ export class Hud {
 
 			block.icons[4]!.alpha = upgraded((ent?.dash ?? 0) > 0);
 			block.counts[4]!.text = (ent?.dash ?? 0) > 0 ? String(Math.ceil(ent?.phaseT ?? 0)) : '';
+
+			for (let l = 0; l < block.letters.length; ++l) {
+				const idx = ps.letters[l] ? l + 1 : 0;
+				block.letters[l]!.texture = this.sheets.frame(
+					this.extraSheet!,
+					idx * EXTRA_W,
+					0,
+					EXTRA_W,
+					EXTRA_H,
+				);
+			}
 		}
 	}
 }

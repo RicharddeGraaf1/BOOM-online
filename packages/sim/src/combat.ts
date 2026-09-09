@@ -23,6 +23,14 @@ const EXPLOSION_DAMAGE_TIME = 0.25;
 /** Een aangestoken bom gaat vrijwel meteen af. Bomb::ignite() */
 const IGNITED_FUSE = 0.05;
 
+/**
+ * Een letter staat drie seconden stil en morft dan in 0,4 s naar de volgende.
+ * src/lifish/entities/Letter.cpp:22 (TRANSITION_DELAY) en :83 (vier frames van 0,1 s).
+ */
+export const LETTER_HOLD = 3;
+export const LETTER_MORPH = 0.4;
+export const LETTER_CYCLE = LETTER_HOLD + LETTER_MORPH;
+
 export function updateCombat(w: World, dt: number): void {
 	for (const e of w.entities) {
 		if (e.kind !== 'bomb' || e.dead) continue;
@@ -34,6 +42,17 @@ export function updateCombat(w: World, dt: number): void {
 		if (e.kind !== 'bonus' || e.dead) continue;
 		e.t = (e.t ?? 0) + dt;
 		if (e.t >= BONUS.EXPIRE_TIME) e.dead = true;
+	}
+
+	// Een gevallen letter blijft niet op één letter staan: hij morft door naar de volgende.
+	// Daardoor kun je wachten op de letter die je nog mist. src/lifish/entities/Letter.cpp:76-88.
+	for (const e of w.entities) {
+		if (e.kind !== 'letter' || e.dead) continue;
+		e.t = (e.t ?? 0) + dt;
+		if (e.t >= LETTER_CYCLE) {
+			e.t = 0;
+			e.letter = ((e.letter ?? 0) + 1) % 5;
+		}
 	}
 
 }

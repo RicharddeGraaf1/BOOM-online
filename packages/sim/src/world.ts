@@ -197,6 +197,9 @@ export function findPlayerEntity(w: World, playerId: number): Entity | undefined
  */
 export const LEVEL_CLEAR_GRACE = 4;
 
+/** Hoe lang een opgeraapte munt blijft liggen om zijn draai te laten zien. */
+export const COIN_GRAB_TIME = 0.6;
+
 export function update(w: World, inputs: (PlayerInput | undefined)[], dt = DT): void {
 	w.events.length = 0;
 	// Bij 'cleared' loopt de wereld gewoon door: je kunt nog lopen en oprapen.
@@ -272,7 +275,9 @@ function triggerExtraGame(w: World): void {
 function endExtraGame(w: World): void {
 	w.extraGame = false;
 	for (const e of w.entities) {
-		if (e.kind === 'enemy') e.morphed = false;
+		// Een alien die al ligt te sterven blijft een alien; anders wisselt hij halverwege
+		// zijn doodsanimatie terug naar het beestje dat hij ooit was.
+		if (e.kind === 'enemy' && !e.dead) e.morphed = false;
 		else if (e.kind === 'letter' && !e.dead) e.dead = true;
 	}
 }
@@ -307,6 +312,11 @@ function deathLinger(e: Entity): number {
 		case 'breakable':
 			// Vier frames sloopanimatie op 0,08 s.
 			return 0.32;
+		case 'coin':
+			// Blijft na het oppakken nog even liggen om zijn draai af te maken. Het origineel
+			// houdt hem drie seconden aan (Coin.cpp:20), maar een munt die nog ronddraait
+			// terwijl je al weg bent leest als een fout; drie omwentelingen is genoeg.
+			return COIN_GRAB_TIME;
 		case 'explosion':
 			return 0;
 		default:
