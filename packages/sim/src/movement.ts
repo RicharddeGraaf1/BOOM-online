@@ -49,8 +49,12 @@ export function trySetDirection(e: Entity, dir: Direction): boolean {
 		e.distTravelled = 0;
 		return true;
 	}
+	// Sta je stil, dan mag de bocht altijd. Anders zit je klem: de eis is uitgelijnd zijn,
+	// maar uitgelijnd raak je alleen door te bewegen — en bewegen kan alleen langs de as
+	// waar je al op zat. Je wordt dan naar de dichtstbijzijnde rasterlijn getrokken, hooguit
+	// een halve tegel.
 	const perpendicularAligned = isVertical(dir) ? isAlignedX(e) : isAlignedY(e);
-	if (!perpendicularAligned && e.dir !== Dir.NONE) return false;
+	if (!perpendicularAligned && e.moving && e.dir !== Dir.NONE) return false;
 
 	alignAxis(e, isVertical(dir));
 	e.dir = dir;
@@ -111,6 +115,18 @@ export function moveEntity(w: World, e: Entity, dt: number, blockers?: Uint8Arra
 		}
 		delta = Math.min(delta, remaining);
 	}
+
+	// Nooit in één tick over een tegelgrens heen springen.
+	//
+	// Zonder dit raakt een entity het raster alleen bij toeval. Bij 120 px/s is dat 2 px per
+	// tick en komt hij precies op 32 uit, maar met de speedy-bonus (3x) is het 6 px per tick:
+	// 0, 6, 12 ... 30, 36. Nooit uitgelijnd, dus elke bocht werd geweigerd en het spel voelde
+	// alsof het je invoer negeerde. Het origineel doet hetzelfde met `_ensureAlign()`
+	// (src/core/components/AxisMoving.cpp:150-171): één uitgelijnd frame per tegel, gegarandeerd.
+	const after = cur + step * delta;
+	const crossing =
+		step > 0 ? Math.floor(after / TILE_SIZE) * TILE_SIZE : Math.ceil(after / TILE_SIZE) * TILE_SIZE;
+	if ((crossing - cur) * step > 0) delta = (crossing - cur) * step;
 
 	if (vertical) e.y += step * delta;
 	else e.x += step * delta;

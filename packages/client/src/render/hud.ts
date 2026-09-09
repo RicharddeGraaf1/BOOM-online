@@ -8,11 +8,19 @@
  */
 
 import { Container, Graphics, Sprite, Text, TextStyle, Texture } from 'pixi.js';
-import { MAX_PLAYERS, bonus as BONUS, player as PLAYER, type World } from '@boom/sim';
+import {
+	MAX_PLAYERS,
+	bonus as BONUS,
+	defaultPowers,
+	player as PLAYER,
+	type World,
+} from '@boom/sim';
 import { PLAYER_TINTS } from './playerColors.js';
 import type { Sheets } from './sheets.js';
 
 const FONT = 'BoomPanel';
+/** Waar een speler mee begint; alles daarboven is een opgeraapte upgrade. */
+const DEFAULTS = defaultPowers();
 /**
  * panel.png heeft zijn eigen art: het BOOM-logo bovenaan en het Factor Software-logo
  * onderaan. Daar mag niets overheen, dus alle tekst begint onder het logo en de blokken
@@ -50,6 +58,8 @@ interface PlayerBlock {
 	bombs: Text;
 	health: Graphics;
 	icons: Sprite[];
+	/** Aantal onder het icoon, voor de upgrades die een niveau hebben. */
+	counts: Text[];
 }
 
 export class Hud {
@@ -112,26 +122,34 @@ export class Hud {
 		lives.position.set(4, 35);
 		root.addChild(lives);
 
-		const bombs = label(8, 0xcccccc);
-		bombs.position.set(48, 35);
+		const bombs = label(8, 0xffcc00);
+		bombs.position.set(40, 35);
 		root.addChild(bombs);
 
 		const health = new Graphics();
 		health.position.set(4, 48);
 		root.addChild(health);
 
-		// De vijf permanente bonussen als iconen van 15x15 uit bonus_icons.png.
+		// De vijf permanente bonussen als iconen van 15x15 uit bonus_icons.png, met daaronder
+		// het niveau. Alleen oplichten is niet genoeg: je begint al met vijf bommen, dus dat
+		// icoon zou permanent aanstaan en niets vertellen.
 		const iconSprites: Sprite[] = [];
+		const counts: Text[] = [];
 		for (let i = 0; i < BONUS.N_PERMANENT_BONUS_TYPES; ++i) {
 			const s = new Sprite(this.sheets.frame(icons, i * 15, 0, 15, 15));
 			s.scale.set(1 / this.sheets.textureScale);
-			s.position.set(4 + i * 17, 60);
-			s.alpha = 0.2;
+			s.position.set(3 + i * 18, 56);
+			s.alpha = 0.25;
 			root.addChild(s);
 			iconSprites.push(s);
+
+			const c = label(8, 0xffffff);
+			c.position.set(5 + i * 18, 69);
+			root.addChild(c);
+			counts.push(c);
 		}
 
-		return { root, name, score, lives, bombs, health, icons: iconSprites };
+		return { root, name, score, lives, bombs, health, icons: iconSprites, counts };
 	}
 
 	update(w: World, bombsLeft: (playerId: number) => number): void {
@@ -166,7 +184,7 @@ export class Hud {
 
 			block.score.text = String(ps.score).padStart(7, '0');
 			block.lives.text = `x${ps.remainingLives}`;
-			block.bombs.text = `${bombsLeft(ps.id)}/${ps.powers.maxBombs}`;
+			block.bombs.text = `${bombsLeft(ps.id)}/${ps.powers.maxBombs} bom`;
 
 			const frac = Math.max(0, Math.min(1, ps.life / PLAYER.MAX_LIFE));
 			block.health
@@ -176,11 +194,26 @@ export class Hud {
 				.rect(0, 0, Math.round(88 * frac), 6)
 				.fill({ color: frac > 0.35 ? 0x33cc33 : 0xff3300 });
 
-			block.icons[0]!.alpha = ps.powers.maxBombs > 1 ? 1 : 0.2;
-			block.icons[1]!.alpha = ps.powers.bombFuseTime < 5 ? 1 : 0.2;
-			block.icons[2]!.alpha = ps.powers.bombRadius > 2 ? 1 : 0.2;
-			block.icons[3]!.alpha = 0.2;
-			block.icons[4]!.alpha = 0.2;
+			// Volgorde van bonus_icons.png is die van BonusType: bommen, lont, bereik,
+			// schild, speedy. De eerste drie zijn blijvend en tonen hun niveau; de laatste
+			// twee zijn tijdelijk en lichten op zolang ze lopen.
+			const ent = w.entities.find((e) => e.kind === 'player' && e.playerId === ps.id);
+			const upgraded = (on: boolean) => (on ? 1 : 0.3);
+
+			block.icons[0]!.alpha = upgraded(ps.powers.maxBombs > DEFAULTS.maxBombs);
+			block.counts[0]!.text = String(ps.powers.maxBombs);
+
+			block.icons[1]!.alpha = upgraded(ps.powers.bombFuseTime < DEFAULTS.bombFuseTime);
+			block.counts[1]!.text = ps.powers.bombFuseTime < DEFAULTS.bombFuseTime ? 'snel' : '';
+
+			block.icons[2]!.alpha = upgraded(ps.powers.bombRadius > DEFAULTS.bombRadius);
+			block.counts[2]!.text = String(ps.powers.bombRadius);
+
+			block.icons[3]!.alpha = upgraded((ent?.shieldT ?? 0) > 0);
+			block.counts[3]!.text = (ent?.shieldT ?? 0) > 0 ? String(Math.ceil(ent!.shieldT)) : '';
+
+			block.icons[4]!.alpha = upgraded((ent?.dash ?? 0) > 0);
+			block.counts[4]!.text = (ent?.dash ?? 0) > 0 ? String(Math.ceil(ent?.phaseT ?? 0)) : '';
 		}
 	}
 }

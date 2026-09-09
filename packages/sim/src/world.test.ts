@@ -133,6 +133,56 @@ describe('beweging', () => {
 		expect(p.x).toBeGreaterThan(TILE_SIZE + 10);
 	});
 
+	/**
+	 * Dit was de bug achter "de pijltjes voelen niet responsive". Bij 120 px/s is een tick
+	 * precies 2 px en kom je vanzelf op een veelvoud van 32 uit, maar met de speedy-bonus is
+	 * het 6 px: 0, 6, 12 ... 30, 36. Nooit uitgelijnd, dus elke bocht werd geweigerd.
+	 */
+	it('kan ook met de speedy-bonus nog van richting wisselen', () => {
+		const w = makeWorld(['X....', '.....', '....A']);
+		const p = ents(w, 'player')[0]!;
+		p.dash = 2; // speedy: driemaal de snelheid
+		p.phaseT = 60;
+
+		run(w, 4, press({ right: true }));
+		expect(p.dir).toBe(Dir.RIGHT);
+
+		// Binnen één tegel aan ticks moet de bocht gepakt zijn.
+		for (let i = 0; i < 8 && p.dir !== Dir.DOWN; ++i) {
+			update(w, [press({ down: true }), undefined]);
+		}
+		expect(p.dir).toBe(Dir.DOWN);
+	});
+
+	it('springt nooit in één tick over een tegelgrens heen', () => {
+		const w = makeWorld(['X....', '.....', '....A']);
+		const p = ents(w, 'player')[0]!;
+		p.dash = 2;
+		p.phaseT = 60;
+
+		// Elke tegelgrens moet precies aangedaan worden, anders is uitlijnen toeval.
+		const seen = new Set<number>();
+		for (let i = 0; i < 40; ++i) {
+			update(w, [press({ right: true }), undefined]);
+			if (Number.isInteger(p.x / TILE_SIZE)) seen.add(p.x / TILE_SIZE);
+		}
+		expect([...seen].sort((a, b) => a - b)).toEqual([2, 3, 4, 5]);
+	});
+
+	it('kan wél draaien vanuit stilstand midden op een tegel', () => {
+		// Anders zit je klem: draaien vraagt om uitgelijnd zijn, uitgelijnd raken vraagt om
+		// bewegen, en bewegen kan alleen langs de as waar je al op zat.
+		const w = makeWorld(['X....', '.....', '....A']);
+		const p = ents(w, 'player')[0]!;
+
+		run(w, 5, press({ right: true }));
+		run(w, 2); // loslaten, ergens midden op een tegel
+		expect(p.moving).toBe(false);
+
+		update(w, [press({ down: true }), undefined]);
+		expect(p.dir).toBe(Dir.DOWN);
+	});
+
 	it('mag pas van as wisselen als hij op het raster staat', () => {
 		const w = makeWorld(['X.A', '...']);
 		const p = ents(w, 'player')[0]!;
